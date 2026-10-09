@@ -1,0 +1,57 @@
+{
+  "sources": [
+    {
+      "name": "console-setup",
+      "version": "1.242~deb13u1",
+      "url": "https://deb.debian.org/debian/pool/main/c/console-setup/console-setup_{version}.tar.xz",
+      "dest": "sources/console-setup",
+      "strip_components": 1,
+      "include": ["Fonts/**", "rules.mk", "COPYRIGHT", "debian/copyright", "copyright.fonts", "GPL-2"]
+    },
+    {
+      "name": "terminus-font",
+      "version": "4.49.1",
+      "url": "https://downloads.sourceforge.net/project/terminus-font/terminus-font-{major_minor}/terminus-font-{version}.tar.gz",
+      "dest": "sources/terminus-font",
+      "strip_components": 1
+    },
+    {
+      "name": "ucs-fonts",
+      "url": "https://www.cl.cam.ac.uk/~mgk25/download/ucs-fonts.tar.gz",
+      "dest": "sources/ucs-fonts",
+      "include": ["*.bdf", "README", "AUTHORS"]
+    },
+    {
+      "name": "uni-vga",
+      "url": "https://www.inp.nsk.su/~bolkhov/files/fonts/univga/uni-vga.tgz",
+      "dest": "sources/uni-vga",
+      "strip_components": 1
+    },
+    {
+      "name": "dejavu",
+      "version": "2.37",
+      "url": "https://downloads.sourceforge.net/project/dejavu/dejavu/{version}/dejavu-fonts-ttf-{version}.tar.bz2",
+      "dest": "sources/dejavu",
+      "strip_components": 1,
+      "include": ["ttf/DejaVuSansMono*.ttf", "LICENSE", "AUTHORS", "README.md"]
+    },
+    {
+      "name": "ttf2psf",
+      "enabled": false,
+      "version": "1.0.1",
+      "url": "https://github.com/NateChoe1/ttf2psf/archive/refs/tags/v{version}.tar.gz",
+      "filename": "ttf2psf-{version}.tar.gz",
+      "dest": "sources/ttf2psf",
+      "strip_components": 1
+    },
+    {
+      "name": "otf2bdf",
+      "enabled": false,
+      "version": "3.1",
+      "url": "https://github.com/jirutka/otf2bdf/archive/refs/tags/v{version}.tar.gz",
+      "filename": "otf2bdf-{version}.tar.gz",
+      "dest": "sources/otf2bdf",
+      "strip_components": 1
+    }
+  ]
+}

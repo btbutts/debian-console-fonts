@@ -1,0 +1,30 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["sources", ".venv"]
+
+[tool.ruff.lint]
+preview = true
+select = ["E", "W", "F", "I", "N", "D", "UP", "B", "C4", "SIM", "PL", "FURB", "RUF", "PTH",
+          "PIE", "RET", "PERF", "TRY", "ARG"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.pylint.main]
+ignore-paths = ["^sources/", "^.venv/"]
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.pylint.basic]
+module-rgx = "^[a-zA-Z0-9_]+$"
+
+[tool.pyright]
+pythonVersion = "3.12"
+include = ["tools", "tests", ".github/actions-scripts"]
+extraPaths = ["tools", ".github/actions-scripts"]
+typeCheckingMode = "standard"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
