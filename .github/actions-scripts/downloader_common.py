@@ -103,7 +103,7 @@ def sha256_buffer(buffer: io.BytesIO) -> str:
 def parse_content_length(headers) -> int | None:
     """Return the parsed Content-Length value, or None if unavailable."""
     raw = headers.get("Content-Length")
-    if raw is None or raw == "":
+    if not raw:
         return None
     try:
         length = int(raw)

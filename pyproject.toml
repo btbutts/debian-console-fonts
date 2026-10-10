@@ -1,6 +1,7 @@
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+src = ["tools", ".github/actions-scripts"]
 extend-exclude = ["sources", ".venv"]
 
 [tool.ruff.lint]
@@ -13,6 +14,7 @@ convention = "pep257"
 
 [tool.pylint.main]
 ignore-paths = ["^sources/", "^.venv/"]
+source-roots = ["tools", ".github/actions-scripts"]
 
 [tool.pylint.format]
 max-line-length = 100

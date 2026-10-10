@@ -33,25 +33,7 @@
       "url": "https://downloads.sourceforge.net/project/dejavu/dejavu/{version}/dejavu-fonts-ttf-{version}.tar.bz2",
       "dest": "sources/dejavu",
       "strip_components": 1,
-      "include": ["ttf/DejaVuSansMono*.ttf", "LICENSE", "AUTHORS", "README.md"]
-    },
-    {
-      "name": "ttf2psf",
-      "enabled": false,
-      "version": "1.0.1",
-      "url": "https://github.com/NateChoe1/ttf2psf/archive/refs/tags/v{version}.tar.gz",
-      "filename": "ttf2psf-{version}.tar.gz",
-      "dest": "sources/ttf2psf",
-      "strip_components": 1
-    },
-    {
-      "name": "otf2bdf",
-      "enabled": false,
-      "version": "3.1",
-      "url": "https://github.com/jirutka/otf2bdf/archive/refs/tags/v{version}.tar.gz",
-      "filename": "otf2bdf-{version}.tar.gz",
-      "dest": "sources/otf2bdf",
-      "strip_components": 1
+      "include": ["ttf/*.ttf", "LICENSE", "AUTHORS", "README.md"]
     }
   ]
 }

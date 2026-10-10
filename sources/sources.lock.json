@@ -19,7 +19,7 @@
     "dejavu": {
       "dest": "sources/dejavu",
       "include": [
-        "ttf/DejaVuSansMono*.ttf",
+        "ttf/*.ttf",
         "LICENSE",
         "AUTHORS",
         "README.md"
@@ -47,6 +47,14 @@
       "sha256": "702fd1cdef9123e1871622a897727977c0933a420c50c94198f5bb22de8f0f8a",
       "strip_components": 0,
       "url": "https://www.cl.cam.ac.uk/~mgk25/download/ucs-fonts.tar.gz",
+      "version": null
+    },
+    "uni-vga": {
+      "dest": "sources/uni-vga",
+      "include": [],
+      "sha256": "6667a143e8d06765fb7027116af563b1b8ee833f310744673fea6a5f20d25617",
+      "strip_components": 1,
+      "url": "https://www.inp.nsk.su/~bolkhov/files/fonts/univga/uni-vga.tgz",
       "version": null
     }
   }

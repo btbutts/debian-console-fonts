@@ -110,7 +110,9 @@ def _file_mode(mode: int) -> int:
     return EXEC_FILE_MODE if mode & EXEC_BITS else PLAIN_FILE_MODE
 
 
-def _write_tar_member(tar: tarfile.TarFile, member: tarfile.TarInfo, target: Path, rel: str) -> bool:
+def _write_tar_member(
+    tar: tarfile.TarFile, member: tarfile.TarInfo, target: Path, rel: str
+) -> bool:
     """Write one tar member to *target*; return False if it is skipped."""
     if member.issym():
         check_symlink(rel, member.linkname)
