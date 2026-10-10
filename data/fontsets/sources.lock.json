@@ -1,0 +1,53 @@
+{
+  "lock_version": 1,
+  "sources": {
+    "dejavu": {
+      "dest": "data/fontsets/dejavu",
+      "include": [
+        "ttf/*.ttf"
+      ],
+      "sha256": "fa9ca4d13871dd122f61258a80d01751d603b4d3ee14095d65453b4e846e17d7",
+      "strip_components": 1,
+      "url": "https://downloads.sourceforge.net/project/dejavu/dejavu/2.37/dejavu-fonts-ttf-2.37.tar.bz2",
+      "version": "2.37"
+    },
+    "terminus-font": {
+      "dest": "data/fontsets/terminus-font",
+      "include": [
+        "ter-u*.bdf"
+      ],
+      "sha256": "d961c1b781627bf417f9b340693d64fc219e0113ad3a3af1a3424c7aa373ef79",
+      "strip_components": 1,
+      "url": "https://downloads.sourceforge.net/project/terminus-font/terminus-font-4.49/terminus-font-4.49.1.tar.gz",
+      "version": "4.49.1"
+    },
+    "ucs-fonts": {
+      "dest": "data/fontsets/ucs-fonts",
+      "include": [
+        "7x14.bdf",
+        "7x14B.bdf",
+        "8x13.bdf",
+        "8x13B.bdf",
+        "8x13O.bdf",
+        "9x15.bdf",
+        "9x15B.bdf",
+        "9x18.bdf",
+        "9x18B.bdf"
+      ],
+      "sha256": "702fd1cdef9123e1871622a897727977c0933a420c50c94198f5bb22de8f0f8a",
+      "strip_components": 0,
+      "url": "https://www.cl.cam.ac.uk/~mgk25/download/ucs-fonts.tar.gz",
+      "version": null
+    },
+    "uni-vga": {
+      "dest": "data/fontsets/uni-vga",
+      "include": [
+        "u_vga16.bdf"
+      ],
+      "sha256": "6667a143e8d06765fb7027116af563b1b8ee833f310744673fea6a5f20d25617",
+      "strip_components": 1,
+      "url": "https://www.inp.nsk.su/~bolkhov/files/fonts/univga/uni-vga.tgz",
+      "version": null
+    }
+  }
+}

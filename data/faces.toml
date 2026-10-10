@@ -1,0 +1,165 @@
+# The console font faces, and which BDF fonts each is made from.
+#
+# This file belongs to this project and is edited by hand. It began as the data of
+# console-setup 1.242~deb13u1's Fonts/Makefile (GPL-2.0-or-later, Copyright Anton Zinoviev
+# and others); nothing reads that Makefile any more.
+#
+# A BDF named here is looked for in the upstream sources (sources/terminus-font,
+# sources/ucs-fonts, sources/uni-vga) and then in bdf/ (see bdf/README.md). The DejaVu
+# faces are not listed: they are rendered from the TrueType files.
+
+# Ordinary faces. The BDFs of a face are listed with the highest priority first: when
+# several define a symbol, the first one wins.
+[faces]
+Fixed13 = ["8x13-IL2.bdf", "8x13.bdf", "8x13c.bdf"]
+Fixed14 = ["georgian14.bdf", "7x14-IL2.bdf", "7x14.bdf", "7x14c.bdf", "h14.bdf", "etl14-unicode.bdf"]
+Fixed15 = ["9x15-IL2.bdf", "9x15.bdf", "9x15c.bdf"]
+Fixed16 = ["georgian16.bdf", "unifont.bdf", "h16.bdf", "etl16-unicode.bdf"]
+Fixed18 = ["9x18.bdf"]
+Fixed24x12 = ["h24.bdf", "etl24-unicode.bdf"]
+FixedBold13 = ["8x13B.bdf", "8x13Bc.bdf"]
+FixedBold14 = ["h14_b.bdf", "7x14B-IL2.bdf", "7x14B.bdf", "7x14c.bdf"]
+FixedBold15 = ["9x15B-IL2.bdf", "9x15B.bdf", "9x15Bc.bdf"]
+FixedBold16 = ["h16_b.bdf"]
+FixedBold18 = ["9x18B.bdf"]
+FixedBold24x12 = ["h24_b.bdf"]
+FixedOblique13 = ["8x13O.bdf", "8x13.bdf"]
+Terminus12x6 = ["ter-u12n.bdf"]
+Terminus14 = ["ter-u14n.bdf"]
+Terminus16 = ["ter-u16n.bdf"]
+Terminus22x11 = ["ter-u22n.bdf"]
+Terminus24x12 = ["ter-u24n.bdf"]
+Terminus18x10 = ["ter-u18n.bdf"]
+Terminus20x10 = ["ter-u20n.bdf"]
+Terminus28x14 = ["ter-u28n.bdf"]
+Terminus32x16 = ["ter-u32n.bdf"]
+TerminusBold12x6 = ["ter-u12b.bdf"]
+TerminusBold14 = ["ter-u14b.bdf"]
+TerminusBold16 = ["ter-u16b.bdf"]
+TerminusBold18x10 = ["ter-u18b.bdf"]
+TerminusBold20x10 = ["ter-u20b.bdf"]
+TerminusBold22x11 = ["ter-u22b.bdf"]
+TerminusBold24x12 = ["ter-u24b.bdf"]
+TerminusBold28x14 = ["ter-u28b.bdf"]
+TerminusBold32x16 = ["ter-u32b.bdf"]
+TerminusBoldVGA14 = ["ter-u14v.bdf"]
+TerminusBoldVGA16 = ["ter-u16v.bdf"]
+Courier13 = ["75dpi-courR12-IL2.bdf", "75dpi-courR12.bdf", "75dpi-courR12c.bdf"]
+Courier14 = ["100dpi-courR10-IL2.bdf", "100dpi-courR10.bdf"]
+Courier15 = ["75dpi-courR14-IL2.bdf", "75dpi-courR14.bdf", "75dpi-courR14c.bdf"]
+Courier16 = ["8x16c.bdf", "8x16-IL2.bdf"]
+CourierBold13 = ["75dpi-courB12-IL2.bdf", "75dpi-courB12.bdf", "75dpi-courB12c.bdf"]
+CourierBold14 = ["100dpi-courB10-IL2.bdf", "100dpi-courB10.bdf"]
+CourierBold15 = ["75dpi-courB14-IL2.bdf", "75dpi-courB14.bdf", "75dpi-courB14c.bdf"]
+Lucid12 = ["100dpi-lutRS08-IL2.bdf", "100dpi-lutRS08.bdf"]
+Lucid13 = ["75dpi-lutRS12-IL2.bdf", "75dpi-lutRS12.bdf", "75dpi-lutRS12c.bdf"]
+Lucid15 = ["75dpi-lutRS14-IL2.bdf", "75dpi-lutRS14.bdf", "75dpi-lutRS14c.bdf"]
+Lucid16 = ["100dpi-lutRS10-IL2.bdf", "100dpi-lutRS10.bdf"]
+Lucid22x12 = ["100dpi-lutRS14-IL2.bdf", "100dpi-lutRS14.bdf"]
+Lucid29x16 = ["100dpi-lutRS19.bdf"]
+LucidBold11 = ["100dpi-lutBS08-IL2.bdf", "100dpi-lutBS08.bdf"]
+LucidBold13 = ["75dpi-lutBS12-IL2.bdf", "75dpi-lutBS12.bdf", "75dpi-lutBS12c.bdf"]
+LucidBold15 = ["75dpi-lutBS14-IL2.bdf", "75dpi-lutBS14.bdf", "75dpi-lutBS14c.bdf"]
+LucidBold16 = ["100dpi-lutBS10-IL2.bdf", "100dpi-lutBS10.bdf"]
+LucidBold22x12 = ["100dpi-lutBS14-IL2.bdf", "100dpi-lutBS14.bdf"]
+LucidBold29x16 = ["100dpi-lutBS19.bdf"]
+Goha12 = ["Goha12.bdf"]
+Goha14 = ["Goha14.bdf"]
+Goha16 = ["Goha16.bdf"]
+GohaClassic12 = ["GohaClassic12.bdf"]
+GohaClassic14 = ["GohaClassic14.bdf"]
+GohaClassic16 = ["GohaClassic16.bdf"]
+
+# VGA faces, whose fonts depend on the code set.
+[legacy]
+faces = ["VGA8", "VGA10", "VGA12", "VGA14", "VGA16", "VGA19", "VGA28x16", "VGA32x16"]
+
+# The BDF a VGA face uses for a code set that has no list of its own.
+[legacy.defaults]
+VGA8 = "legacy8a.bdf"
+VGA10 = "legacy10a.bdf"
+VGA12 = "legacy12a.bdf"
+VGA14 = "legacy14a.bdf"
+VGA19 = "legacy19a.bdf"
+VGA28x16 = "legacy14a-double.bdf"
+
+# The code sets each VGA face is made for.
+[legacy.codesets]
+VGA8 = ["Arabic", "CyrKoi", "CyrSlav", "FullCyrSlav", "Greek", "FullGreek", "Hebrew", "Lat15", "Lat2", "Lat38", "Lat7", "Uni1", "Uni2"]
+VGA10 = ["Lat15", "Lat2"]
+VGA12 = ["Lat15", "Lat2"]
+VGA14 = ["Arabic", "CyrKoi", "CyrSlav", "FullCyrSlav", "Greek", "FullGreek", "Hebrew", "Lat15", "Lat2", "Lat38", "Lat7", "Uni1", "Uni2"]
+VGA16 = ["Arabic", "CyrKoi", "CyrSlav", "FullCyrSlav", "Greek", "FullGreek", "Hebrew", "Lat15", "Lat2", "Lat38", "Lat7", "Uni1", "Uni2"]
+VGA19 = ["Lat15"]
+VGA28x16 = ["Arabic", "CyrKoi", "CyrSlav", "FullCyrSlav", "Greek", "FullGreek", "Hebrew", "Lat15", "Lat2", "Lat38", "Lat7", "Uni1", "Uni2"]
+VGA32x16 = ["Arabic", "CyrKoi", "CyrSlav", "FullCyrSlav", "Greek", "FullGreek", "Hebrew", "Lat15", "Lat2", "Lat38", "Lat7", "Uni1", "Uni2"]
+
+# VGA faces drawn from one Uni-VGA font for every code set; scale 2 enlarges it twofold.
+[legacy.uni_vga]
+VGA16 = { font = "u_vga16.bdf", scale = 1 }
+VGA32x16 = { font = "u_vga16.bdf", scale = 2 }
+
+[legacy.bdfs.Arabic]
+"14" = ["legacy14i.bdf", "legacy14f.bdf", "legacy14l.bdf", "legacy14b.bdf"]
+"28x16" = ["legacy14i-double.bdf", "legacy14f-double.bdf", "legacy14l-double.bdf", "legacy14b-double.bdf"]
+"8" = ["legacy8f.bdf", "legacy8d.bdf", "legacy8i.bdf", "legacy8b.bdf"]
+
+[legacy.bdfs.CyrKoi]
+"14" = ["legacy14b.bdf", "legacy14a.bdf", "legacy14c.bdf", "legacy14g.bdf"]
+"28x16" = ["legacy14b-double.bdf", "legacy14a-double.bdf", "legacy14c-double.bdf", "legacy14g-double.bdf"]
+"8" = ["legacy8b.bdf", "legacy8a.bdf"]
+
+[legacy.bdfs.CyrSlav]
+"14" = ["legacy14a.bdf", "legacy14l.bdf", "legacy14c.bdf", "legacy14e.bdf", "legacy14i.bdf"]
+"28x16" = ["legacy14a-double.bdf", "legacy14l-double.bdf", "legacy14c-double.bdf", "legacy14e-double.bdf", "legacy14i-double.bdf"]
+"8" = ["legacy8a.bdf", "legacy8i.bdf", "legacy8b.bdf", "legacy8c.bdf", "legacy8f.bdf"]
+
+[legacy.bdfs.Greek]
+"14" = ["legacy14g.bdf", "legacy14l.bdf", "legacy14b.bdf", "legacy14i.bdf"]
+"28x16" = ["legacy14g-double.bdf", "legacy14l-double.bdf", "legacy14b-double.bdf", "legacy14i-double.bdf"]
+"8" = ["legacy8a.bdf", "legacy8i.bdf", "legacy8b.bdf", "legacy8f.bdf"]
+
+[legacy.bdfs.Hebrew]
+"14" = ["legacy14h.bdf", "legacy14l.bdf", "legacy14i.bdf", "legacy14b.bdf"]
+"28x16" = ["legacy14h-double.bdf", "legacy14l-double.bdf", "legacy14i-double.bdf", "legacy14b-double.bdf"]
+"8" = ["legacy8e.bdf", "legacy8i.bdf", "legacy8f.bdf", "legacy8b.bdf"]
+
+[legacy.bdfs.Lat15]
+"10" = ["legacy10b.bdf", "legacy10a.bdf", "legacy10d.bdf"]
+"12" = ["legacy12a.bdf", "legacy12d.bdf", "legacy12c.bdf"]
+"14" = ["legacy14i.bdf", "legacy14l.bdf", "legacy14a.bdf", "legacy14b.bdf"]
+"19" = ["legacy19a.bdf"]
+"28x16" = ["legacy14i-double.bdf", "legacy14l-double.bdf", "legacy14a-double.bdf", "legacy14b-double.bdf"]
+"8" = ["legacy8a.bdf", "legacy8i.bdf", "legacy8b.bdf", "legacy8f.bdf"]
+
+[legacy.bdfs.Lat2]
+"10" = ["legacy10d.bdf", "legacy10a.bdf", "legacy10b.bdf"]
+"12" = ["legacy12c.bdf", "legacy12d.bdf", "legacy12a.bdf"]
+"14" = ["legacy14k.bdf", "legacy14l.bdf", "legacy14i.bdf", "legacy14b.bdf"]
+"28x16" = ["legacy14k-double.bdf", "legacy14l-double.bdf", "legacy14i-double.bdf", "legacy14b-double.bdf"]
+"8" = ["legacy8f.bdf", "legacy8i.bdf", "legacy8b.bdf"]
+
+[legacy.bdfs.Lat38]
+"14" = ["legacy14e.bdf", "legacy14i.bdf", "legacy14b.bdf"]
+"28x16" = ["legacy14e-double.bdf", "legacy14i-double.bdf", "legacy14b-double.bdf"]
+"8" = ["legacy8c.bdf", "legacy8f.bdf", "legacy8b.bdf"]
+
+[legacy.bdfs.Lat7]
+"14" = ["legacy14l.bdf", "legacy14e.bdf", "legacy14i.bdf", "legacy14b.bdf"]
+"28x16" = ["legacy14l-double.bdf", "legacy14e-double.bdf", "legacy14i-double.bdf", "legacy14b-double.bdf"]
+"8" = ["legacy8i.bdf", "legacy8c.bdf", "legacy8f.bdf", "legacy8b.bdf"]
+
+[legacy.bdfs.Uni1]
+"14" = ["legacy14a.bdf", "legacy14e.bdf", "legacy14f.bdf", "legacy14l.bdf", "legacy14h.bdf", "legacy14c.bdf"]
+"28x16" = ["legacy14a-double.bdf", "legacy14e-double.bdf", "legacy14f-double.bdf", "legacy14l-double.bdf", "legacy14h-double.bdf", "legacy14c-double.bdf"]
+"8" = ["legacy8a.bdf", "legacy8c.bdf", "legacy8d.bdf", "legacy8i.bdf", "legacy8e.bdf", "legacy8b.bdf"]
+
+[legacy.bdfs.Uni2]
+"14" = ["legacy14e.bdf", "legacy14a.bdf", "legacy14g.bdf", "legacy14l.bdf", "legacy14c.bdf", "legacy14i.bdf"]
+"28x16" = ["legacy14e-double.bdf", "legacy14a-double.bdf", "legacy14g-double.bdf", "legacy14l-double.bdf", "legacy14c-double.bdf", "legacy14i-double.bdf"]
+"8" = ["legacy8a.bdf", "legacy8c.bdf", "legacy8i.bdf", "legacy8b.bdf", "legacy8f.bdf"]
+
+# All code sets, and the faces offered unless every face is asked for (POOL=all).
+[sets]
+codesets = ["Armenian", "CyrAsia", "CyrKoi", "CyrSlav", "Georgian", "Greek", "Hebrew", "Lao", "Lat15", "Lat2", "Lat38", "Lat7", "Thai", "Arabic", "Ethiopian", "Uni1", "Uni2", "Uni3", "Vietnamese", "FullCyrAsia", "FullCyrSlav", "FullGreek"]
+good_faces = ["Fixed13", "Fixed14", "Fixed15", "Fixed16", "Fixed18", "Terminus12x6", "Terminus14", "Terminus16", "Terminus22x11", "Terminus24x12", "Terminus18x10", "Terminus20x10", "Terminus28x14", "Terminus32x16", "TerminusBold14", "TerminusBold16", "TerminusBold18x10", "TerminusBold20x10", "TerminusBold22x11", "TerminusBold24x12", "TerminusBold28x14", "TerminusBold32x16", "TerminusBoldVGA14", "TerminusBoldVGA16", "Goha12", "Goha14", "Goha16", "GohaClassic12", "GohaClassic14", "GohaClassic16", "VGA8", "VGA14", "VGA16", "VGA28x16", "VGA32x16"]

@@ -39,6 +39,16 @@ def _symbols_of(name: str, sections: dict[str, dict[str, Any]]) -> list[int]:
     return list(section["symbols"])
 
 
+def text_symbols(text: str) -> set[int]:
+    """Return the code points that the BDF font *text* defines."""
+    codes: set[int] = set()
+    for line in text.split("\n"):
+        found = ENCODING.fullmatch(line)
+        if found:
+            codes.add(int(found.group(1)))
+    return codes
+
+
 def font_symbols(paths: Iterable[Path]) -> set[int]:
     """Return the code points that the BDF fonts define."""
     codes: set[int] = set()
@@ -48,10 +58,7 @@ def font_symbols(paths: Iterable[Path]) -> set[int]:
         except OSError as exc:
             message = f"{path}: {exc.strerror}"
             raise CodesetError(message) from exc
-        for line in text.split("\n"):
-            found = ENCODING.fullmatch(line)
-            if found:
-                codes.add(int(found.group(1)))
+        codes |= text_symbols(text)
     return codes
 
 

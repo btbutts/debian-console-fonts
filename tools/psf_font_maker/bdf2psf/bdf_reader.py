@@ -94,15 +94,14 @@ def split_lines(text: str) -> list[str]:
 class BdfReader:
     """Read one BDF file into a :class:`GlyphSet`: first the header, then the glyphs."""
 
-    def __init__(self, path: Path, target: GlyphSet, warn: Callable[[str], None]) -> None:
-        """Open *path* to be read into *target*, reporting problems through *warn*."""
-        self._path = path
+    def __init__(self, name: str, text: str, target: GlyphSet, warn: Callable[[str], None]) -> None:
+        """Prepare to read the font *text*, called *name*, into *target*; problems go to *warn*."""
+        self._path = name
         self._target = target
         self._warn = warn
         self._metrics = _Metrics()
         self._glyph = _Glyph()
         self._number = 0
-        text = path.read_bytes().decode("latin-1")
         self._lines: Iterator[tuple[int, str]] = enumerate(split_lines(text), start=1)
 
     def read_header(self) -> None:
@@ -248,8 +247,13 @@ def _fitted(data: list[int], placement: _Placement) -> list[int]:
     return [0] * before + data + [0] * after
 
 
-def read_bdf(path: Path, target: GlyphSet, warn: Callable[[str], None]) -> None:
-    """Read the BDF at *path* into *target*."""
-    reader = BdfReader(path, target, warn)
+def read_bdf_text(name: str, text: str, target: GlyphSet, warn: Callable[[str], None]) -> None:
+    """Read the BDF font *text*, known as *name*, into *target*."""
+    reader = BdfReader(name, text, target, warn)
     reader.read_header()
     reader.read_glyphs()
+
+
+def read_bdf(path: Path, target: GlyphSet, warn: Callable[[str], None]) -> None:
+    """Read the BDF at *path* into *target*."""
+    read_bdf_text(str(path), path.read_bytes().decode("latin-1"), target, warn)

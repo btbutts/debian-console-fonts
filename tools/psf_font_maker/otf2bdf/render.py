@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
+import ctypes.util
 import importlib
 import os
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from psf_font_maker.otf2bdf.crop import crop_bitmap
@@ -17,11 +20,11 @@ from psf_font_maker.otf2bdf.glyphs import (
     Size,
     Vertical,
 )
+from psf_font_maker.otf2bdf.library import LIBRARY_DIR_ENV, library_files
 from psf_font_maker.otf2bdf.tables import read_hhea
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
-    from pathlib import Path
+    from collections.abc import Generator, Iterator
     from types import ModuleType
 
 # FreeType 2.13.2 and older hint some glyphs differently (a pixel here and there). 2.13.3
@@ -54,6 +57,42 @@ def add_homebrew_to_library_path() -> None:
         os.environ.setdefault("DYLD_FALLBACK_LIBRARY_PATH", MACOS_LIBRARY_DIRS)
 
 
+def use_library_dir(directory: Path) -> None:
+    """Make the next ``load_freetype`` use the FreeType library in *directory*.
+
+    This is passed in the environment, so that worker processes started later use it too.
+    """
+    os.environ[LIBRARY_DIR_ENV] = str(directory)
+
+
+@contextlib.contextmanager
+def chosen_library() -> Generator[None]:
+    """Make freetype-py find the library in the directory set by ``use_library_dir``.
+
+    freetype-py asks ``ctypes.util.find_library`` for the library when it is imported; for
+    that moment the answer is the file in the chosen directory.
+    """
+    directory = os.environ.get(LIBRARY_DIR_ENV)
+    if not directory:
+        yield
+        return
+    files = library_files(Path(directory))
+    if not files:
+        message = f"no FreeType library (libfreetype) in {directory}"
+        raise RenderError(message)
+    original = ctypes.util.find_library
+
+    def find_library(name: str) -> str | None:
+        """Answer for FreeType with the chosen file, for anything else as usual."""
+        return str(files[0]) if name == "freetype" else original(name)
+
+    ctypes.util.find_library = find_library
+    try:
+        yield
+    finally:
+        ctypes.util.find_library = original
+
+
 def load_freetype() -> ModuleType:
     """Import the freetype-py package (a module called ``freetype``) and vet its FreeType.
 
@@ -62,7 +101,8 @@ def load_freetype() -> ModuleType:
     """
     add_homebrew_to_library_path()
     try:
-        module = importlib.import_module("freetype")
+        with chosen_library():
+            module = importlib.import_module("freetype")
     except ImportError as exc:
         message = "rendering TrueType fonts needs the freetype-py package (pip install freetype-py)"
         raise RenderError(message) from exc
@@ -72,8 +112,9 @@ def load_freetype() -> ModuleType:
         wanted = ".".join(str(part) for part in MINIMUM_FREETYPE)
         message = (
             f"FreeType {found} is too old: it draws some glyphs differently from {wanted} and "
-            "later. The wheels of freetype-py bundle an old FreeType; build it against the "
-            "system library instead: pip install --no-binary freetype-py freetype-py"
+            "later. Run `make freetype` to find or build a suitable one; if freetype-py came "
+            "as a wheel it brings its own old FreeType and ignores the system's, so install it "
+            "from source instead: pip install --no-binary freetype-py freetype-py"
         )
         raise RenderError(message)
     return module

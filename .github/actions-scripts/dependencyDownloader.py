@@ -16,8 +16,9 @@ Manifest mode::
 
 ``sources.json`` lists archives to fetch and unpack into fixed directories; its
 keys are documented in ``sources_manifest.py``. Every entry is downloaded each
-run and compared with ``sources/sources.lock.json``; a directory is rewritten
-only when the archive, the URL, the version or the unpack options changed.
+run and unpacked to a temporary place; a directory is rewritten, and
+``data/fontsets/sources.lock.json`` updated, only when the files differ from
+those already there.
 
 When running in GitHub Actions, the step output ``changed`` is written to
 ``$GITHUB_OUTPUT`` as ``true`` if anything was created or replaced and

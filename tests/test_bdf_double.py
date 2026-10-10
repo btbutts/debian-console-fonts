@@ -10,7 +10,7 @@ import pytest
 from psf_font_maker.bdf_double import enlarge as bdf_double
 
 ROOT = Path(__file__).resolve().parents[1]
-UNI_VGA = ROOT / "sources" / "uni-vga" / "u_vga16.bdf"
+UNI_VGA = ROOT / "data" / "fontsets" / "uni-vga" / "u_vga16.bdf"
 DEBIAN_DOUBLE = ROOT / "sources" / "console-setup" / "Fonts" / "bdf" / "u_vga16-double.bdf"
 
 TINY_FONT = """STARTFONT 2.1
@@ -72,7 +72,8 @@ def test_input_without_glyphs_is_rejected() -> None:
 
 
 @pytest.mark.skipif(
-    not (UNI_VGA.is_file() and DEBIAN_DOUBLE.is_file()), reason="sources/ not populated"
+    not (UNI_VGA.is_file() and DEBIAN_DOUBLE.is_file()),
+    reason="console-setup is not downloaded (enable it in sources.json)",
 )
 def test_enlarging_uni_vga_matches_console_setups_double() -> None:
     """Our enlargement of Uni-VGA has the same glyphs as console-setup's bdfresize output."""

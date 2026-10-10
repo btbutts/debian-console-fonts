@@ -7,6 +7,7 @@ import types
 from pathlib import Path
 
 import pytest
+from support import needs_freetype
 
 from psf_font_maker.bdf2psf.bdf_reader import GlyphSet, read_bdf
 from psf_font_maker.main import main
@@ -19,22 +20,10 @@ from psf_font_maker.otf2bdf.render import as_short, render_font, trunc_div
 from psf_font_maker.otf2bdf.tables import read_hhea
 
 ROOT = Path(__file__).resolve().parents[1]
-MONO = ROOT / "sources" / "dejavu" / "ttf" / "DejaVuSansMono.ttf"
+MONO = ROOT / "data" / "fontsets" / "dejavu" / "ttf" / "DejaVuSansMono.ttf"
 
 
-def usable_freetype() -> bool:
-    """Return True if freetype-py is installed and its FreeType is new enough to render."""
-    try:
-        render.load_freetype()
-    except RenderError:
-        return False
-    return True
-
-
-needs_freetype = pytest.mark.skipif(
-    not usable_freetype(), reason="needs freetype-py with a recent enough FreeType"
-)
-needs_font = pytest.mark.skipif(not MONO.is_file(), reason="sources/dejavu not populated")
+needs_font = pytest.mark.skipif(not MONO.is_file(), reason="DejaVu not downloaded")
 
 CELL_WIDTH = 16
 CELL_HEIGHT = 30

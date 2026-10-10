@@ -16,19 +16,21 @@ from psf_font_maker.bdf_double import cli as bdf_double_cli
 from psf_font_maker.common.errors import ToolError
 from psf_font_maker.compare_fonts import cli as compare_fonts_cli
 from psf_font_maker.fontcodesets import cli as fontcodesets_cli
+from psf_font_maker.fonts import cli as fonts_cli
+from psf_font_maker.freetype_lib import cli as freetype_cli
 from psf_font_maker.otf2bdf import cli as otf2bdf_cli
-from psf_font_maker.update_faces import cli as update_faces_cli
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 TOOLS = (
+    fonts_cli,
+    freetype_cli,
     bdf2psf_cli,
     fontcodesets_cli,
     bdf_double_cli,
     compare_fonts_cli,
     otf2bdf_cli,
-    update_faces_cli,
 )
 
 

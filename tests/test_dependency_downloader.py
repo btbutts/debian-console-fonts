@@ -17,9 +17,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 import pytest
+from requests.adapters import HTTPAdapter
 
 import archive_extract
 import dependencyDownloader
+import downloader_common
 import sources_manifest
 import sources_sync
 
@@ -27,6 +29,8 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
 OCTET_STREAM = "application/octet-stream"
+SERVICE_UNAVAILABLE = 503
+NOT_FOUND = 404
 TarMode = Literal["w:gz", "w:bz2", "w:xz"]
 
 
@@ -151,9 +155,37 @@ def web_fixture(tmp_path: Path) -> Generator[FileServer, None, None]:
         yield server
 
 
+SHORT_KEYS = {
+    "enabled": "is-in-use",
+    "dest": "destination-path",
+    "include": "matched-fonts",
+    "keep": "keep-files",
+    "user_agent": "user-agent",
+}
+ARCHIVE_KEYS = {"strip_components": "strip-components", "keep_archive": "keep-archive"}
+
+
+def manifest_of(sources: list[dict]) -> dict:
+    """Return the manifest object for entries written in the tests' short form.
+
+    The short form is a flat dictionary with a ``name`` and Python-friendly key names; the
+    manifest keys the source by name and nests the archive settings.
+    """
+    manifest = {}
+    for short in sources:
+        body: dict = {}
+        for key, value in short.items():
+            if key in ARCHIVE_KEYS:
+                body.setdefault("archive", {})[ARCHIVE_KEYS[key]] = value
+            elif key != "name":
+                body[SHORT_KEYS.get(key, key)] = value
+        manifest[short["name"]] = body
+    return manifest
+
+
 def run(root: Path, sources: list, *extra: str) -> int:
     """Write a manifest into *root* and run the downloader on it."""
-    (root / "sources.json").write_text(json.dumps({"sources": sources}), encoding="utf-8")
+    (root / "sources.json").write_text(json.dumps(manifest_of(sources)), encoding="utf-8")
     return dependencyDownloader.main(
         ["--sources", "sources.json", "--root", str(root), *extra]
     )
@@ -242,38 +274,75 @@ def test_glob_matching(pattern: str, path: str, expected: bool) -> None:
 @pytest.mark.parametrize(
     ("bad", "message"),
     [
-        ({"name": "a", "url": "u", "dest": "../x"}, "relative path"),
-        ({"name": "a", "url": "u", "dest": "/abs"}, "relative path"),
-        ({"name": "a", "url": "u", "dest": "."}, "relative path"),
-        ({"name": "a", "url": "u", "dest": "d", "bogus": 1}, "unknown keys"),
-        ({"name": "bad name", "url": "u", "dest": "d"}, "name may only"),
-        ({"name": "a", "dest": "d"}, "'url' is required"),
-        ({"name": "a", "url": "u", "dest": "d", "strip_components": -1}, "integer >= 0"),
-        ({"name": "a", "url": "u", "dest": "d", "include": "x"}, "'include'"),
-        ({"name": "a", "url": "u", "dest": "d", "enabled": "yes"}, "true or false"),
+        ({"url": "u", "destination-path": "../x"}, "relative path"),
+        ({"url": "u", "destination-path": "/abs"}, "relative path"),
+        ({"url": "u", "destination-path": "."}, "relative path"),
+        ({"url": "u", "destination-path": ""}, "'destination-path' is required"),
+        ({"url": "u", "destination-path": "d", "bogus": 1}, "unknown keys"),
+        ({"url": "u", "destination-path": "d", "dest": "d"}, "unknown keys"),
+        ({"destination-path": "d"}, "'url' is required"),
+        ({"url": "", "destination-path": "d"}, "'url' is required"),
+        (
+            {"url": "u", "destination-path": "d", "archive": {"strip-components": -1}},
+            "integer >= 0",
+        ),
+        ({"url": "u", "destination-path": "d", "archive": {"bogus": 1}}, "keys in 'archive'"),
+        ({"url": "u", "destination-path": "d", "archive": []}, "'archive' must be an object"),
+        ({"url": "u", "destination-path": "d", "matched-fonts": "x"}, "'matched-fonts'"),
+        ({"url": "u", "destination-path": "d", "is-in-use": "yes"}, "true or false"),
+        ({"url": "u", "destination-path": "d", "download": "no"}, "true or false"),
+        ({"url": "u", "destination-path": "d", "sha256": "abc"}, "64 hexadecimal"),
+        ({"url": 5, "destination-path": "d"}, "must be a string"),
     ],
 )
 def test_manifest_validation(tmp_path: Path, bad: dict, message: str) -> None:
     """Invalid manifest entries are rejected with a clear message."""
     path = tmp_path / "m.json"
-    path.write_text(json.dumps({"sources": [bad]}))
+    path.write_text(json.dumps({"a": bad}))
     with pytest.raises(sources_manifest.SourceError, match=message):
         sources_manifest.load_sources(path)
 
 
-def test_manifest_rejects_duplicates_and_nested_dests(tmp_path: Path) -> None:
-    """Names must be unique and destinations must not overlap."""
+def test_manifest_names_are_checked(tmp_path: Path) -> None:
+    """A name with odd characters, or a manifest that is not an object, is refused."""
     path = tmp_path / "m.json"
-    path.write_text(json.dumps([
-        {"name": "a", "url": "u", "dest": "s/a"},
-        {"name": "a", "url": "u", "dest": "s/b"},
-    ]))
-    with pytest.raises(sources_manifest.SourceError, match="duplicate"):
+    path.write_text(json.dumps({"bad name": {"url": "u", "destination-path": "d"}}))
+    with pytest.raises(sources_manifest.SourceError, match="name may only"):
         sources_manifest.load_sources(path)
-    path.write_text(json.dumps([
-        {"name": "a", "url": "u", "dest": "s/a"},
-        {"name": "b", "url": "u", "dest": "s/a/inner"},
-    ]))
+    path.write_text(json.dumps({"sources": [{"name": "a"}]}))
+    with pytest.raises(sources_manifest.SourceError, match="must be an object"):
+        sources_manifest.load_sources(path)
+    path.write_text(json.dumps([]))
+    with pytest.raises(sources_manifest.SourceError, match="non-empty object"):
+        sources_manifest.load_sources(path)
+
+
+def test_empty_values_mean_no_value(tmp_path: Path) -> None:
+    """A fully written-out entry with ``""``, ``[]`` and ``0`` for what it does not use loads."""
+    path = tmp_path / "m.json"
+    path.write_text(json.dumps({"a": {
+        "is-in-use": True, "download": False, "version": "", "url": "", "sha256": "",
+        "filename": "", "user-agent": "", "destination-path": "d",
+        "archive": {"strip-components": 0, "keep-archive": False},
+        "matched-fonts": [], "keep-files": [],
+    }}))
+    (source,) = sources_manifest.load_sources(path)
+    assert (source.version, source.url, source.fetch.sha256, source.fetch.filename) == (
+        None, "", None, None,
+    )
+
+
+def test_manifest_rejects_repeated_names_and_nested_destinations(tmp_path: Path) -> None:
+    """A name must not appear twice and destinations must not overlap."""
+    path = tmp_path / "m.json"
+    first = '{"url": "u", "destination-path": "s/a"}'
+    path.write_text(f'{{"a": {first}, "a": {first}}}')
+    with pytest.raises(sources_manifest.SourceError, match="twice"):
+        sources_manifest.load_sources(path)
+    path.write_text(json.dumps({
+        "a": {"url": "u", "destination-path": "s/a"},
+        "b": {"url": "u", "destination-path": "s/a/inner"},
+    }))
     with pytest.raises(sources_manifest.SourceError, match="inside"):
         sources_manifest.load_sources(path)
 
@@ -298,7 +367,7 @@ def test_first_run_extracts_filters_and_locks(repo: Path, web: FileServer) -> No
     assert files_under(dest) == ["Fonts/Makefile", "Fonts/bdf/a.bdf", "Fonts/bdf2psf"]
     assert (dest / "Fonts" / "bdf2psf").stat().st_mode & 0o111
     assert not (dest / "Fonts" / "Makefile").stat().st_mode & 0o111
-    lock = json.loads((repo / "sources" / "sources.lock.json").read_text())
+    lock = json.loads((repo / "data" / "fontsets" / "sources.lock.json").read_text())
     assert lock["sources"]["font"]["sha256"] == hashlib.sha256(archive).hexdigest()
     assert outputs(repo) == {"changed": "true", "changed_sources": "font", "failed_sources": ""}
 
@@ -309,10 +378,10 @@ def test_second_run_is_unchanged_and_leaves_files_alone(repo: Path, web: FileSer
     assert run(repo, [entry(web)]) == 0
     target = repo / "sources" / "font" / "a.txt"
     before = target.stat().st_mtime_ns
-    lock_before = (repo / "sources" / "sources.lock.json").read_text()
+    lock_before = (repo / "data" / "fontsets" / "sources.lock.json").read_text()
     assert run(repo, [entry(web)]) == 0
     assert target.stat().st_mtime_ns == before
-    assert (repo / "sources" / "sources.lock.json").read_text() == lock_before
+    assert (repo / "data" / "fontsets" / "sources.lock.json").read_text() == lock_before
     assert outputs(repo)["changed"] == "false"
 
 
@@ -340,7 +409,7 @@ def test_version_bump_fetches_the_new_url(repo: Path, web: FileServer) -> None:
     assert (repo / "sources" / "font" / "f.txt").read_text() == "1.0"
     run(repo, [entry(web, version="1.1", **url)])
     assert (repo / "sources" / "font" / "f.txt").read_text() == "1.1"
-    lock = json.loads((repo / "sources" / "sources.lock.json").read_text())
+    lock = json.loads((repo / LOCK).read_text())
     assert lock["sources"]["font"]["version"] == "1.1"
     assert lock["sources"]["font"]["url"].endswith("/font-1.1.tar.gz")
 
@@ -472,6 +541,170 @@ def test_disabled_entries_are_never_contacted(repo: Path, web: FileServer) -> No
     assert run(repo, [entry(web), off]) == 0
     assert all(path != "/off.tar.gz" for path, _ in web.requests)
     assert not (repo / "sources" / "off").exists()
+
+
+def test_kept_files_survive_an_update(repo: Path, web: FileServer) -> None:
+    """The project's own files named in ``keep-files`` are carried across a replaced tree."""
+    web.put("font.tar.gz", make_tar({"t/a.bdf": b"v1", "t/README": b"upstream"}))
+    kept = entry(web, include=["*.bdf"], keep=["LICENSE.md", "docs/NOTES.md"])
+    run(repo, [kept])
+    dest = repo / "sources" / "font"
+    (dest / "docs").mkdir()
+    (dest / "LICENSE.md").write_text("ours")
+    (dest / "docs" / "NOTES.md").write_text("also ours")
+    (dest / "stray.txt").write_text("not listed, so it goes")
+    web.put("font.tar.gz", make_tar({"t/a.bdf": b"v2", "t/README": b"upstream 2"}))
+    assert run(repo, [kept]) == 0
+    assert files_under(dest) == ["LICENSE.md", "a.bdf", "docs/NOTES.md"]
+    assert (dest / "LICENSE.md").read_text() == "ours"
+    assert (dest / "a.bdf").read_text() == "v2"
+
+
+@pytest.mark.parametrize("bad", ["../x", "/etc/passwd", "a/../b", "./a"])
+def test_keep_must_be_a_plain_relative_path(tmp_path: Path, bad: str) -> None:
+    """A ``keep-files`` entry that could point outside the tree is refused."""
+    manifest = tmp_path / "sources.json"
+    manifest.write_text(
+        json.dumps(
+            {"f": {"url": "http://x/f.tgz", "destination-path": "s/f", "keep-files": [bad]}}
+        )
+    )
+    with pytest.raises(sources_manifest.SourceError, match="keep-files"):
+        sources_manifest.load_sources(manifest)
+
+
+def test_a_changed_font_is_replaced_and_recorded(repo: Path, web: FileServer) -> None:
+    """When a kept file really changes, the tree is replaced and the lock follows."""
+    kept = entry(web, include=["*.bdf"])
+    web.put("font.tar.gz", make_tar({"t/a.bdf": b"A", "t/README": b"v1"}))
+    run(repo, [kept])
+    lock_before = (repo / LOCK).read_text()
+    web.put("font.tar.gz", make_tar({"t/a.bdf": b"A, improved", "t/README": b"v1"}))
+    assert run(repo, [kept]) == 0
+    assert (repo / "sources" / "font" / "a.bdf").read_text() == "A, improved"
+    assert (repo / LOCK).read_text() != lock_before
+    assert outputs(repo)["changed_sources"] == "font"
+
+
+def test_settings_that_change_with_identical_files_update_only_the_lock(
+    repo: Path, web: FileServer
+) -> None:
+    """A manifest edit that does not change the files rewrites the lock, not the fonts."""
+    web.put("font.tar.gz", make_tar({"t/a.bdf": b"A"}))
+    run(repo, [entry(web, include=["*.bdf"])])
+    target = repo / "sources" / "font" / "a.bdf"
+    before = target.stat().st_mtime_ns
+    assert run(repo, [entry(web, include=["*.bdf", "*.missing"])]) == 0
+    assert target.stat().st_mtime_ns == before
+    lock = json.loads((repo / LOCK).read_text())
+    assert lock["sources"]["font"]["include"] == ["*.bdf", "*.missing"]
+    assert outputs(repo)["changed_sources"] == "font"
+
+
+def test_a_locally_edited_font_is_put_back(repo: Path, web: FileServer) -> None:
+    """The destination is the archive's files; an edit to one of them is undone."""
+    web.put("font.tar.gz", make_tar({"t/a.bdf": b"A"}))
+    kept = entry(web, include=["*.bdf"], keep=["LICENSE.md"])
+    run(repo, [kept])
+    dest = repo / "sources" / "font"
+    (dest / "LICENSE.md").write_text("ours")
+    assert run(repo, [kept]) == 0
+    assert outputs(repo)["changed"] == "false"  # our own files do not count
+    (dest / "a.bdf").write_text("edited by hand")
+    assert run(repo, [kept]) == 0
+    assert (dest / "a.bdf").read_text() == "A"
+    assert (dest / "LICENSE.md").read_text() == "ours"
+    assert outputs(repo)["changed"] == "true"
+
+
+def test_requests_are_retried_on_temporary_failures() -> None:
+    """Timeouts, connection errors and temporary server errors are tried again, 404s are not."""
+    session = downloader_common.new_session()
+    adapter = session.get_adapter("https://example.org/")
+    assert isinstance(adapter, HTTPAdapter)
+    retry = adapter.max_retries
+    assert retry.total == downloader_common.HTTP_RETRIES
+    assert SERVICE_UNAVAILABLE in retry.status_forcelist
+    assert NOT_FOUND not in retry.status_forcelist
+
+
+def test_entries_that_are_not_downloaded_are_left_alone(repo: Path, web: FileServer) -> None:
+    """``download: false`` entries are never fetched, locked or touched, and need no URL."""
+    web.put("font.tar.gz", make_tar({"t/f": b"x"}))
+    fetched_elsewhere = {
+        "name": "later", "download": False, "dest": "build/later", "url": web.url("later.tar.gz")
+    }
+    by_hand = {"name": "by-hand", "download": False, "dest": "data/by-hand"}
+    (repo / "data" / "by-hand").mkdir(parents=True)
+    (repo / "data" / "by-hand" / "mine.txt").write_text("mine", encoding="utf-8")
+    assert run(repo, [entry(web), fetched_elsewhere, by_hand]) == 0
+    assert all(path != "/later.tar.gz" for path, _ in web.requests)
+    assert not (repo / "build").exists()
+    assert (repo / "data" / "by-hand" / "mine.txt").read_text(encoding="utf-8") == "mine"
+    assert set(json.loads((repo / LOCK).read_text())["sources"]) == {"font"}
+    assert run(repo, [entry(web), fetched_elsewhere], "--only", "later") == 1
+
+
+def test_a_download_with_the_recorded_checksum_needs_nothing_done(
+    repo: Path, web: FileServer
+) -> None:
+    """The same SHA-256 is the same file: nothing is unpacked, compared or written."""
+    archive = make_tar({"t/f": b"x"})
+    web.put("font.tar.gz", archive)
+    digest = hashlib.sha256(archive).hexdigest()
+    assert run(repo, [entry(web, sha256=digest)]) == 0  # first run installs
+    target = repo / "sources" / "font" / "f"
+    target.write_text("edited by hand")
+    assert run(repo, [entry(web, sha256=digest)]) == 0
+    assert target.read_text() == "edited by hand"  # not even looked at
+    assert outputs(repo)["changed"] == "false"
+
+
+def test_a_different_checksum_means_the_files_are_compared(repo: Path, web: FileServer) -> None:
+    """Another SHA-256 means a changed archive: its files are compared and installed."""
+    web.put("font.tar.gz", make_tar({"t/f": b"new"}))
+    assert run(repo, [entry(web, sha256="0" * 64)]) == 0
+    assert (repo / "sources" / "font" / "f").read_text() == "new"
+
+
+LOCK = Path("data") / "fontsets" / "sources.lock.json"
+
+
+def test_a_repackaged_archive_with_the_same_files_changes_nothing(
+    repo: Path, web: FileServer
+) -> None:
+    """A new SHA-256 but identical files writes nothing: no change is reported."""
+    web.put("font.tar.gz", make_tar({"t/f": b"x"}))
+    run(repo, [entry(web, sha256="0" * 64)])
+    web.put("font.tar.gz", make_tar({"t/f": b"x"}, mode="w:bz2"))
+    lock = (repo / LOCK).read_text()
+    assert run(repo, [entry(web, sha256="1" * 64)]) == 0
+    assert outputs(repo)["changed"] == "false"
+    assert (repo / LOCK).read_text() == lock
+
+
+def test_a_changed_archive_records_its_checksum_in_the_manifest(
+    repo: Path, web: FileServer
+) -> None:
+    """When files really change, the manifest's sha256 becomes the new archive's."""
+    archive = make_tar({"t/f": b"new"})
+    web.put("font.tar.gz", archive)
+    run(repo, [entry(web, sha256="0" * 64)])
+    saved = json.loads((repo / "sources.json").read_text())
+    assert saved["font"]["sha256"] == hashlib.sha256(archive).hexdigest()
+
+
+def test_changed_settings_are_applied_even_with_the_same_checksum(
+    repo: Path, web: FileServer
+) -> None:
+    """The same archive unpacked with other settings is not 'nothing to do'."""
+    archive = make_tar({"t/a.bdf": b"1", "t/b.txt": b"2"})
+    web.put("font.tar.gz", archive)
+    digest = hashlib.sha256(archive).hexdigest()
+    run(repo, [entry(web, sha256=digest, include=["*.bdf"])])
+    assert files_under(repo / "sources" / "font") == ["a.bdf"]
+    run(repo, [entry(web, sha256=digest, include=["*.bdf", "*.txt"])])
+    assert files_under(repo / "sources" / "font") == ["a.bdf", "b.txt"]
 
 
 def test_user_agent_default_and_override(repo: Path, web: FileServer) -> None:

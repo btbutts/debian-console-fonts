@@ -1,39 +1,188 @@
 {
-  "sources": [
-    {
-      "name": "console-setup",
-      "version": "1.242~deb13u1",
-      "url": "https://deb.debian.org/debian/pool/main/c/console-setup/console-setup_{version}.tar.xz",
-      "dest": "sources/console-setup",
-      "strip_components": 1,
-      "include": ["Fonts/**", "rules.mk", "COPYRIGHT", "debian/copyright", "copyright.fonts", "GPL-2"]
+  "console-setup": {
+    "is-in-use": false,
+    "download": true,
+    "version": "1.242~deb13u1",
+    "url": "https://deb.debian.org/debian/pool/main/c/console-setup/console-setup_{version}.tar.xz",
+    "sha256": "3c5eaeedc2d602a3ca8537bb0a333c66975b7867b33a6fa2d67fbd8a3dff2e21",
+    "filename": "",
+    "user-agent": "",
+    "destination-path": "sources/console-setup",
+    "archive": {
+      "strip-components": 1,
+      "keep-archive": false
     },
-    {
-      "name": "terminus-font",
-      "version": "4.49.1",
-      "url": "https://downloads.sourceforge.net/project/terminus-font/terminus-font-{major_minor}/terminus-font-{version}.tar.gz",
-      "dest": "sources/terminus-font",
-      "strip_components": 1
+    "matched-fonts": [
+      "Fonts/Makefile",
+      "Fonts/soft.Makefile",
+      "Fonts/bdf2psf",
+      "Fonts/fontcodesets",
+      "Fonts/bdf/**",
+      "Fonts/fontsets/**",
+      "Fonts/*.equivalents",
+      "Fonts/*.set",
+      "rules.mk"
+    ],
+    "keep-files": []
+  },
+  "terminus-font": {
+    "is-in-use": true,
+    "download": true,
+    "version": "4.49.1",
+    "url": "https://downloads.sourceforge.net/project/terminus-font/terminus-font-{major_minor}/terminus-font-{version}.tar.gz",
+    "sha256": "d961c1b781627bf417f9b340693d64fc219e0113ad3a3af1a3424c7aa373ef79",
+    "filename": "",
+    "user-agent": "",
+    "destination-path": "data/fontsets/terminus-font",
+    "archive": {
+      "strip-components": 1,
+      "keep-archive": false
     },
-    {
-      "name": "ucs-fonts",
-      "url": "https://www.cl.cam.ac.uk/~mgk25/download/ucs-fonts.tar.gz",
-      "dest": "sources/ucs-fonts",
-      "include": ["*.bdf", "README", "AUTHORS"]
+    "matched-fonts": [
+      "ter-u*.bdf"
+    ],
+    "keep-files": [
+      "README.md",
+      "AUTHORS.md",
+      "LICENSE.md"
+    ]
+  },
+  "ucs-fonts": {
+    "is-in-use": true,
+    "download": true,
+    "version": "",
+    "url": "https://www.cl.cam.ac.uk/~mgk25/download/ucs-fonts.tar.gz",
+    "sha256": "702fd1cdef9123e1871622a897727977c0933a420c50c94198f5bb22de8f0f8a",
+    "filename": "",
+    "user-agent": "",
+    "destination-path": "data/fontsets/ucs-fonts",
+    "archive": {
+      "strip-components": 0,
+      "keep-archive": false
     },
-    {
-      "name": "uni-vga",
-      "url": "https://www.inp.nsk.su/~bolkhov/files/fonts/univga/uni-vga.tgz",
-      "dest": "sources/uni-vga",
-      "strip_components": 1
+    "matched-fonts": [
+      "7x14.bdf",
+      "7x14B.bdf",
+      "8x13.bdf",
+      "8x13B.bdf",
+      "8x13O.bdf",
+      "9x15.bdf",
+      "9x15B.bdf",
+      "9x18.bdf",
+      "9x18B.bdf"
+    ],
+    "keep-files": [
+      "README.md",
+      "AUTHORS.md",
+      "LICENSE.md"
+    ]
+  },
+  "uni-vga": {
+    "is-in-use": true,
+    "download": true,
+    "version": "",
+    "url": "https://www.inp.nsk.su/~bolkhov/files/fonts/univga/uni-vga.tgz",
+    "sha256": "6667a143e8d06765fb7027116af563b1b8ee833f310744673fea6a5f20d25617",
+    "filename": "",
+    "user-agent": "",
+    "destination-path": "data/fontsets/uni-vga",
+    "archive": {
+      "strip-components": 1,
+      "keep-archive": false
     },
-    {
-      "name": "dejavu",
-      "version": "2.37",
-      "url": "https://downloads.sourceforge.net/project/dejavu/dejavu/{version}/dejavu-fonts-ttf-{version}.tar.bz2",
-      "dest": "sources/dejavu",
-      "strip_components": 1,
-      "include": ["ttf/*.ttf", "LICENSE", "AUTHORS", "README.md"]
-    }
-  ]
+    "matched-fonts": [
+      "u_vga16.bdf"
+    ],
+    "keep-files": [
+      "README.md",
+      "AUTHORS.md",
+      "LICENSE.md"
+    ]
+  },
+  "dejavu": {
+    "is-in-use": true,
+    "download": true,
+    "version": "2.37",
+    "url": "https://downloads.sourceforge.net/project/dejavu/dejavu/{version}/dejavu-fonts-ttf-{version}.tar.bz2",
+    "sha256": "fa9ca4d13871dd122f61258a80d01751d603b4d3ee14095d65453b4e846e17d7",
+    "filename": "",
+    "user-agent": "",
+    "destination-path": "data/fontsets/dejavu",
+    "archive": {
+      "strip-components": 1,
+      "keep-archive": false
+    },
+    "matched-fonts": [
+      "ttf/*.ttf"
+    ],
+    "keep-files": [
+      "README.md",
+      "AUTHORS.md",
+      "LICENSE.md"
+    ]
+  },
+  "debian-legacy-fonts": {
+    "is-in-use": true,
+    "download": false,
+    "version": "",
+    "url": "",
+    "sha256": "",
+    "filename": "",
+    "user-agent": "",
+    "destination-path": "data/fontsets/debian-legacy-fonts",
+    "archive": {
+      "strip-components": 0,
+      "keep-archive": false
+    },
+    "matched-fonts": [],
+    "keep-files": []
+  },
+  "freetype": {
+    "is-in-use": true,
+    "download": false,
+    "version": "2.14.3",
+    "url": "https://download.savannah.gnu.org/releases/freetype/freetype-{version}.tar.gz",
+    "sha256": "e61b31ab26358b946e767ed7eb7f4bb2e507da1cfefeb7a8861ace7fd5c899a1",
+    "filename": "",
+    "user-agent": "",
+    "destination-path": "build/freetype",
+    "archive": {
+      "strip-components": 0,
+      "keep-archive": false
+    },
+    "matched-fonts": [],
+    "keep-files": []
+  },
+  "otf2bdf": {
+    "is-in-use": false,
+    "download": true,
+    "version": "3.1",
+    "url": "https://github.com/jirutka/otf2bdf/archive/refs/tags/v{version}.tar.gz",
+    "sha256": "5842a6c604a8aa747f9f49838e3a91ce587c8568681300bc70418aeebd7ecc43",
+    "filename": "otf2bdf-{version}.tar.gz",
+    "user-agent": "",
+    "destination-path": "sources/otf2bdf",
+    "archive": {
+      "strip-components": 1,
+      "keep-archive": false
+    },
+    "matched-fonts": [],
+    "keep-files": []
+  },
+  "ttf2psf": {
+    "is-in-use": false,
+    "download": true,
+    "version": "1.0.1",
+    "url": "https://github.com/NateChoe1/ttf2psf/archive/refs/tags/v{version}.tar.gz",
+    "sha256": "b845e8a116f0fee9fa47d50f5097dc61e123b0227f85dfb51a1abff63e75c746",
+    "filename": "ttf2psf-{version}.tar.gz",
+    "user-agent": "",
+    "destination-path": "sources/ttf2psf",
+    "archive": {
+      "strip-components": 1,
+      "keep-archive": false
+    },
+    "matched-fonts": [],
+    "keep-files": []
+  }
 }

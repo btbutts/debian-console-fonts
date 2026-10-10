@@ -15,6 +15,21 @@ convention = "pep257"
 [tool.pylint.main]
 ignore-paths = ["^sources/", "^.venv/"]
 source-roots = ["tools", ".github/actions-scripts"]
+# pylint E0401 does a real import; source-roots does not put these on sys.path.
+# Works from this directory or from the OpenWRT workspace root.
+init-hook = """
+import sys
+from pathlib import Path
+cwd = Path.cwd()
+for base in (cwd / "debian-console-fonts", cwd):
+    tools = base / "tools"
+    if (tools / "psf_font_maker").is_dir():
+        sys.path.insert(0, str(tools))
+        scripts = base / ".github" / "actions-scripts"
+        if scripts.is_dir():
+            sys.path.insert(0, str(scripts))
+        break
+"""
 
 [tool.pylint.format]
 max-line-length = 100
@@ -30,3 +45,4 @@ typeCheckingMode = "standard"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["tools", ".github/actions-scripts"]

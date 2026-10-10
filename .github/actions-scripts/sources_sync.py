@@ -1,10 +1,15 @@
 """Manifest mode of the dependency downloader.
 
-Every enabled entry of ``sources.json`` is downloaded on each run. Its archive
-SHA-256, resolved URL, version and unpack options are compared with the lock
-file; the destination directory is rewritten only when something differs or it
-is missing. Changing ``version`` in the manifest therefore fetches the new
-release automatically.
+Every entry of ``sources.json`` that is in use and to be downloaded (not ``"is-in-use":
+false`` or ``"download": false``) is downloaded on each run. An archive with the SHA-256 the
+manifest records is the one already installed and needs nothing. Any other is unpacked into
+a temporary directory. The files it would
+install are compared, byte for byte, with those already in the destination (the project's
+own ``keep-files`` files excluded); the destination and the lock file are written only when they
+differ, so a repackaged archive with the same files causes no change and no commit. If
+only the settings changed (URL, version, unpack options) just the lock file is
+updated. Changing ``version`` in the manifest therefore fetches the new release
+automatically.
 """
 
 from __future__ import annotations
@@ -36,14 +41,22 @@ from downloader_common import (
     write_chunks,
     write_github_outputs,
 )
-from sources_manifest import Source, SourceError, expand_placeholders, load_sources, resolve_dest
+from sources_manifest import (
+    Source,
+    SourceError,
+    expand_placeholders,
+    load_sources,
+    resolve_dest,
+    update_hashes,
+)
+from tree_compare import tree_files
 
 if TYPE_CHECKING:
     import argparse
 
 # <root>/.github/actions-scripts/sources_sync.py -> <root>
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_LOCK = "sources/sources.lock.json"
+DEFAULT_LOCK = "data/fontsets/sources.lock.json"
 LOCK_VERSION = 1
 
 # Manifest mode identifies itself honestly: SourceForge serves its HTML project
@@ -98,7 +111,7 @@ def fetch_archive(url: str, archive: Path, user_agent: str | None = None) -> str
                 message = (
                     f"the server returned an HTML page ({response.url}) instead of an "
                     "archive; a proxy or filter may be blocking this client, or the "
-                    "site rejects this User-Agent (see the 'user_agent' key)"
+                    "site rejects this User-Agent (see the 'user-agent' key)"
                 )
                 raise SourceError(message)
             remote_size = parse_content_length(response.headers)
@@ -140,27 +153,74 @@ def _remove(path: Path) -> None:
         path.unlink()
 
 
-def _install(source: Source, archive: Path, filename: str, dest: Path) -> int:
-    """Unpack *archive* next to *dest*, then swap it in; return the number of files."""
+def _carry_over(source: Source, dest: Path, staging: Path) -> None:
+    """Copy the project's own files (the ``keep-files`` list) from the old tree into *staging*."""
+    for name in source.unpack.keep:
+        old = dest / name
+        if old.is_file():
+            target = staging / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(old, target)
+
+
+def _fill(source: Source, archive: Path, staging: Path, dest: Path) -> int:
+    """Unpack *archive* into the empty directory *staging*; return the number of files."""
+    count = extract_archive(archive, staging, source.unpack.strip_components, source.unpack.include)
+    if count == 0:
+        message = f"source {source.name!r}: no files matched; refusing to replace {dest}"
+        raise SourceError(message)
+    if source.unpack.keep_archive:
+        (staging / ".archive").mkdir()
+        shutil.copyfile(archive, staging / ".archive" / archive.name)
+    return count
+
+
+def _unpack(source: Source, archive: Path, dest: Path) -> tuple[Path, int]:
+    """Unpack *archive* into a staging directory next to *dest*; return it and the file count."""
     staging = dest.parent / f".{dest.name}.new-{os.getpid()}"
     shutil.rmtree(staging, ignore_errors=True)
     staging.mkdir(parents=True)
     try:
-        count = extract_archive(
-            archive, staging, source.unpack.strip_components, source.unpack.include
-        )
-        if count == 0:
-            message = f"source {source.name!r}: no files matched; refusing to replace {dest}"
-            raise SourceError(message)
-        _warn_dangling_symlinks(staging)
-        if source.unpack.keep_archive:
-            (staging / ".archive").mkdir()
-            shutil.copyfile(archive, staging / ".archive" / Path(filename).name)
-        _remove(dest)
-        staging.replace(dest)
-    finally:
+        count = _fill(source, archive, staging, dest)
+    except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
-    return count
+        raise
+    return staging, count
+
+
+def _same_files(source: Source, staging: Path, dest: Path) -> bool:
+    """Return True if *dest* already holds exactly the files in *staging*.
+
+    The project's own files (the ``keep-files`` list) are not compared.
+    """
+    if not dest.is_dir():
+        return False
+    ignore = set(source.unpack.keep)
+    return tree_files(staging, ignore) == tree_files(dest, ignore)
+
+
+def _swap_in(source: Source, staging: Path, dest: Path) -> None:
+    """Replace *dest* with *staging*, carrying the project's own files across."""
+    _carry_over(source, dest, staging)
+    _warn_dangling_symlinks(staging)
+    _remove(dest)
+    staging.replace(dest)
+
+
+def _settings(record: dict) -> dict:
+    """Return the part of a lock record that does not depend on the archive's exact bytes."""
+    return {key: value for key, value in record.items() if key != "sha256"}
+
+
+def _identical_files(lock: dict, name: str, record: dict) -> str:
+    """Handle a download whose files match what we have; touch the lock only if settings changed."""
+    previous = lock["sources"].get(name)
+    if previous is not None and _settings(previous) == _settings(record):
+        log("Result             : unchanged (the files are identical; nothing written)")
+        return "unchanged"
+    lock["sources"][name] = record
+    log("Result             : lock updated (the files are identical; only the settings changed)")
+    return "relocked"
 
 
 def _url_and_filename(source: Source) -> tuple[str, str]:
@@ -172,10 +232,23 @@ def _url_and_filename(source: Source) -> tuple[str, str]:
     return url, extract_filename(url)
 
 
+def _already_installed(source: Source, lock: dict, record: dict, dest: Path) -> bool:
+    """Return True if the download is the archive that is installed, so nothing is to be done.
+
+    That is so when its SHA-256 is the one in the manifest, the files are there, and the
+    settings they were unpacked with are the current ones. (The SHA-256 says only that the
+    archive is the same file, not that it was unpacked the way the manifest now asks.)
+    """
+    if source.fetch.sha256 != record["sha256"] or not dest.is_dir():
+        return False
+    previous = lock["sources"].get(source.name)
+    return previous is not None and _settings(previous) == _settings(record)
+
+
 def process_source(
     source: Source, root: Path, lock: dict, workdir: Path, *, force: bool = False
 ) -> str:
-    """Fetch and unpack one source. Returns 'created', 'updated' or 'unchanged'."""
+    """Fetch and unpack one source. Returns 'created', 'updated', 'relocked' or 'unchanged'."""
     url, filename = _url_and_filename(source)
     dest = resolve_dest(root, source.dest)
 
@@ -190,14 +263,17 @@ def process_source(
     log(f"Archive SHA-256    : {digest}")
 
     record = _lock_record(source, url, digest)
-    previous = lock["sources"].get(source.name)
-    populated = dest.is_dir() and any(dest.iterdir())
-    if not force and populated and previous == record:
-        log("Result             : unchanged (lock matches; download discarded)")
+    if not force and _already_installed(source, lock, record, dest):
+        log("Result             : unchanged (SHA-256 as in the manifest; nothing to do)")
         return "unchanged"
-
-    status = "updated" if previous is not None and dest.exists() else "created"
-    count = _install(source, archive, filename, dest)
+    staging, count = _unpack(source, archive, dest)
+    try:
+        if not force and _same_files(source, staging, dest):
+            return _identical_files(lock, source.name, record)
+        status = "updated" if source.name in lock["sources"] and dest.exists() else "created"
+        _swap_in(source, staging, dest)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
     lock["sources"][source.name] = record
     log(f"Result             : {status} ({count} files)")
     return status
@@ -210,11 +286,11 @@ def _under(root: Path, path: str) -> Path:
 
 
 def _select(sources: list[Source], only: list[str]) -> list[Source]:
-    """Return the enabled sources, limited to the names in *only* if any are given."""
-    enabled = [source for source in sources if source.enabled]
+    """Return the sources to download, limited to the names in *only* if any are given."""
+    enabled = [source for source in sources if source.enabled and source.fetch.download]
     unknown = sorted(set(only) - {source.name for source in enabled})
     if unknown:
-        message = f"--only names not in the manifest (or disabled): {unknown}"
+        message = f"--only names not in the manifest (or disabled, or not downloaded): {unknown}"
         raise SourceError(message)
     return [source for source in enabled if not only or source.name in only]
 
@@ -264,6 +340,8 @@ def run_sources(args: argparse.Namespace) -> int:
     if changed:
         save_lock(lock_path, lock)
         log(f"Lock file          : updated {lock_path}")
+        update_hashes(manifest, {name: lock["sources"][name]["sha256"] for name in changed})
+        log(f"Manifest           : SHA-256 of {', '.join(changed)} updated")
     write_github_outputs(
         {
             GITHUB_OUTPUT_CHANGED: "true" if changed else "false",

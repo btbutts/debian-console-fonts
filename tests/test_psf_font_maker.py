@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import itertools
 import os
-import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -23,6 +22,9 @@ from psf_font_maker.bdf2psf.equivalence import Equivalence, printable
 from psf_font_maker.bdf2psf.errors import ConversionError, EquivalenceError, FontFormatError
 from psf_font_maker.bdf2psf.random48 import rand_bytes
 from psf_font_maker.common import psf
+from psf_font_maker.fonts.options import Options
+from psf_font_maker.fonts.plan import FontJob, Planner
+from psf_font_maker.fonts.runner import convert as convert_job
 from psf_font_maker.main import main
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -299,49 +301,55 @@ def test_command_line_reports_errors(tmp_path: Path, capsys: pytest.CaptureFixtu
 # identical to the Perl tool
 # --------------------------------------------------------------------------
 
-SOURCES = ROOT / "sources" / "console-setup" / "Fonts"
-perl_comparison = pytest.mark.skipif(
-    not (SOURCES / "fontsets").is_dir()
-    or shutil.which("perl") is None
-    or shutil.which("make") is None,
-    reason="needs sources/, perl and make",
-)
+perl_comparison = pytest.mark.skipif(shutil.which("perl") is None, reason="perl not installed")
 
+# Faces made only from BDF files (no rendering), so that the Perl tool can read them.
 SAMPLE_FACES = (
-    "FACES=Terminus16 Terminus32x16 TerminusBoldVGA14 Fixed13 Fixed16 Fixed18 VGA8 VGA14 "
-    "VGA28x16 VGA32x16 VGA16 FixedOblique13"
+    "Terminus16",
+    "Terminus32x16",
+    "TerminusBoldVGA14",
+    "Fixed13",
+    "Fixed16",
+    "Fixed18",
+    "VGA8",
+    "VGA14",
+    "VGA28x16",
+    "FixedOblique13",
 )
-SAMPLE_CODESETS = "CODESETS=Uni1 Uni2 Lat15 Greek FullGreek Hebrew Arabic CyrSlav"
+SAMPLE_CODESETS = ("Uni1", "Uni2", "Lat15", "Greek", "FullGreek", "Hebrew", "Arabic", "CyrSlav")
 
 
-def recipe_commands(tmp_path: Path) -> list[list[str]]:
-    """Return the arguments of the bdf2psf commands that ``make fonts`` would run."""
-    common = ["make", "-s", f"BUILD={tmp_path / 'build'}", f"OUT={tmp_path / 'out'}"]
-    args = [SAMPLE_FACES, SAMPLE_CODESETS, "USE_UPSTREAM=terminus-font uni-vga ucs-fonts"]
-    subprocess.run([*common, "list", *args], cwd=ROOT, capture_output=True, check=True)
-    dry = subprocess.run(
-        [*common, "-n", "fonts", *args], cwd=ROOT, capture_output=True, text=True, check=True
-    )
-    commands = []
-    for line in dry.stdout.replace("\\\n", " ").splitlines():
-        words = shlex.split(line)
-        if "bdf2psf" in words:
-            end = next(i for i, word in enumerate(words) if word.startswith("2>"))
-            commands.append(words[words.index("bdf2psf") + 1 : end])
-    return commands
+def perl_arguments(job: FontJob) -> list[str]:
+    """Return the arguments the Perl bdf2psf takes for *job* (all its fonts are files)."""
+    paths = [str(spec.path) for spec in job.bdfs]
+    equivalents = [str(path) for path in job.equivalents] or ["/dev/null"]
+    return [
+        *(["--fb"] if job.framebuffer else []),
+        "+".join(paths),
+        "+".join(equivalents),
+        "+".join(job.symbols),
+        str(job.size),
+    ]
 
 
 @perl_comparison
 def test_output_is_identical_to_the_perl_tool(tmp_path: Path) -> None:
     """Every font in a broad sample comes out byte for byte as the Perl bdf2psf makes it."""
-    commands = recipe_commands(tmp_path)
-    assert len(commands) >= SAMPLE_COMMANDS
-    for index, words in enumerate(commands):
-        reference, ours = tmp_path / f"{index}.perl", tmp_path / f"{index}.python"
-        perl = ["perl", str(REFERENCE / "bdf2psf"), *words[:-1], str(reference)]
+    selection = Options(
+        data=ROOT / "data",
+        sources=ROOT / "sources.json",
+        faces=SAMPLE_FACES,
+        codesets=SAMPLE_CODESETS,
+    )
+    jobs = Planner(selection).jobs()
+    assert len(jobs) >= SAMPLE_COMMANDS
+    for job in jobs:
+        reference = tmp_path / f"{job.name}.perl"
+        script = str(REFERENCE / "bdf2psf" / "bdf2psf")
+        perl = ["perl", script, *perl_arguments(job), str(reference)]
         subprocess.run(perl, capture_output=True, check=True)
-        assert main(["bdf2psf", *words[:-1], str(ours)]) == 0, words[-1]
-        assert ours.read_bytes() == reference.read_bytes(), words[-1]
+        data, _ = convert_job(job)
+        assert data == reference.read_bytes(), job.name
 
 
 FONT_SETS = (
@@ -359,17 +367,19 @@ def test_fontcodesets_matches_the_perl_tool(
     tmp_path: Path, capfd: pytest.CaptureFixture[str]
 ) -> None:
     """The code sets reported for real fonts are those the Perl fontcodesets reports."""
-    common = ["make", "-s", f"BUILD={tmp_path / 'build'}", f"OUT={tmp_path / 'out'}", "list"]
-    subprocess.run(common, cwd=ROOT, capture_output=True, check=True)
-    staged = tmp_path / "build" / "Fonts"
+    tree = Planner(Options(data=ROOT / "data", sources=ROOT / "sources.json")).tree
+    directory = tmp_path / "bdf"  # the Perl tool looks for the fonts in ./bdf
+    directory.mkdir()
+    for name in {name for fonts in FONT_SETS for name in fonts.split("+")}:
+        (directory / name).symlink_to(tree.bdf(name).resolve())
     for fonts in FONT_SETS:
         perl = subprocess.run(
-            ["perl", str(REFERENCE / "fontcodesets"), fonts],
-            cwd=staged,
+            ["perl", str(REFERENCE / "fontcodesets" / "fontcodesets"), fonts],
+            cwd=tmp_path,
             capture_output=True,
             text=True,
             check=True,
         )
         capfd.readouterr()
-        assert main(["fontcodesets", "--bdf-dir", str(staged / "bdf"), fonts]) == 0
+        assert main(["fontcodesets", "--bdf-dir", str(directory), fonts]) == 0
         assert capfd.readouterr().out == perl.stdout, fonts

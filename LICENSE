@@ -17,90 +17,86 @@ SPDX-License-Identifier: GPL-2.0-or-later
 
 This applies to:
 
-  Makefile, mk/, tools/ (except tools/psf_font_maker/otf2bdf/), tests/test_makefile.py,
-  tests/test_bdf_double.py, tests/test_psf_font_maker.py, tests/test_otf2bdf.py,
-  tests/conftest.py, README.md, sources.json,
-  pyproject.toml and .github/workflows/.
+  Makefile, tools/ (except tools/psf_font_maker/otf2bdf/), tests/ (except
+  tests/test_dependency_downloader.py and the originals in tests/reference/), README.md,
+  sources.json, pyproject.toml, and .github/workflows/.
 
   tools/psf_font_maker/bdf2psf/ and tools/psf_font_maker/fontcodesets/ (with its
   codesets.toml) are ports of console-setup's bdf2psf and fontcodesets scripts, and
-  tests/reference/ holds the unmodified originals (GPL-2.0-or-later, Copyright Anton
-  Zinoviev; bdf2psf also contains code by Dimitar Toshkov Zhekov). tools/psf_font_maker/otf2bdf/ is derived from third-party
-  code under its own licence, see section 2.
+  tests/reference/bdf2psf/ and tests/reference/fontcodesets/ hold the unmodified
+  originals (GPL-2.0-or-later, Copyright Anton Zinoviev; bdf2psf also contains code by
+  Dimitar Toshkov Zhekov).
 
-  The Makefile and mk/faces.mk are derived from console-setup's Fonts/Makefile
-  (GPL-2.0-or-later, Copyright Anton Zinoviev and others).
+  The tables in data/ (codesets/, the .equivalents and .set files; see data/LICENSE.md)
+  are copies of files of console-setup (GPL-2.0-or-later, Copyright
+  Anton Zinoviev and others). data/faces.toml began as the data of console-setup's
+  Fonts/Makefile.
 
-Exceptions: tools/psf_font_maker/otf2bdf/ (section 2) and the dependency downloader (.github/actions-scripts/ and
-tests/test_dependency_downloader.py) is derived from
-OpenWRT-BuildEnv's repoScripts/dependencyDownloader.py and is licensed under the
-MIT licence, reproduced in section 5.
+Exceptions:
 
-SPDX-License-Identifier: MIT   (for the files named in that exception)
+  - The dependency downloader (.github/actions-scripts/ and
+    tests/test_dependency_downloader.py) is derived from OpenWRT-BuildEnv's
+    repoScripts/dependencyDownloader.py and is licensed under the MIT licence,
+    reproduced in section 5.
+    SPDX-License-Identifier: MIT
+
+  - FreeType is not part of this repository. When no suitable one is installed it is
+    downloaded from the FreeType project and built (see README.md), under the FreeType
+    License or GPL-2.0-or-later at your choice. It is only compiled and loaded; the generated
+    fonts contain none of it.
+
+  - tests/reference/otf2bdf/ holds the unmodified C sources of otf2bdf 3.1 under
+    the licence in their headers (the text is in tools/psf_font_maker/otf2bdf/LICENSE),
+    and tools/psf_font_maker/otf2bdf/ is a port of otf2bdf that keeps that licence
+    (section 2).
+    The FreeType headers beside them are FreeType's, under the FreeType License or the
+    GPL-2.0-or-later at your choice (tests/reference/otf2bdf/freetype-license/).
 
 ================================================================================
-2. Third-party sources (sources/ and tools/psf_font_maker/otf2bdf/)
+2. Third-party fonts and code
 ================================================================================
 
-The files under sources/ are unmodified files from upstream releases (a subset;
-see the include lists in sources.json), fetched by
-.github/actions-scripts/dependencyDownloader.py as listed in sources.json and
-sources/sources.lock.json. They are NOT covered by sections 1, 4 or 5: each one
-keeps its own licence, listed here with the file that contains its full text.
+The fonts are not covered by sections 1, 4 or 5: each keeps its own licence. Every
+directory of fonts in data/fontsets/ has its own LICENSE.md (the licence texts, copied exactly
+from upstream, and which files each covers), AUTHORS.md and README.md; those are the
+authoritative statements. In summary:
 
-  sources/console-setup/   Debian console-setup (version in sources.json)
-                           https://salsa.debian.org/installer-team/console-setup
-      - bdf2psf, fontcodesets, Makefile, fontsets, equivalents, symbol sets:
-        GNU GPL version 2 or (at your option) any later version.
-        Text: sources/console-setup/GPL-2
-        Debian's summary: sources/console-setup/debian/copyright
-      - Fonts/bdf/*.bdf, the source fonts, "are distributed under many different
-        licenses": sources/console-setup/copyright.fonts and
-        sources/console-setup/Fonts/copyright. They include:
-          * u_vga16.bdf (UniVGA) - Copyright (c) 2000, 2001 Dmitry Bolkhovityanov;
-            permissive licence, text in copyright.fonts
-          * 7x14*, 8x13*, 9x15*, 9x18* (X11 misc-fixed, Unicode work by Markus
-            Kuhn) - public domain
-          * 8x16c.bdf, 8x16-IL2.bdf - Copyright Sony Corp.
-          * h14*.bdf, h16*.bdf, h24*.bdf - Copyright /efont/ The Electronic Font
-            Open Laboratory
-          * unifont.bdf - GNU Unifont, Roman Czyborra, David Starner and others
-          * 75dpi-* and 100dpi-* (Courier, Lucida Typewriter) - Adobe and
-            Bigelow & Holmes; *-IL2.bdf conversions by BIZNET Poland, Inc.
-          * georgian16.bdf - Gia Shervashidze; Goha*.bdf and legacy*.bdf - see
-            copyright.fonts
-          * ter-u*.bdf - Terminus (see below)
-          * dejavu-u*.bdf - rendered from DejaVu Sans Mono (see below)
-      - Debian states: "All console fonts are public domain by nature", the
+  data/fontsets/terminus-font/    Terminus Font by Dimitar Toshkov Zhekov
+                                  https://terminus-font.sourceforge.net/
+      - SIL Open Font License, Version 1.1, Reserved Font Name "Terminus Font".
+
+  data/fontsets/ucs-fonts/        Unicode versions of the X11 "misc-fixed" fonts by Markus
+                                  Kuhn and contributors
+                                  https://www.cl.cam.ac.uk/~mgk25/ucs-fonts.html
+      - Public domain.
+
+  data/fontsets/dejavu/           DejaVu fonts (all 22 TrueType files)
+                                  https://dejavu-fonts.github.io/
+      - Bitstream Vera Fonts licence (Copyright (c) 2003 Bitstream, Inc.), Arev Fonts
+        licence (Copyright (c) 2006 Tavmjong Bah) for imported glyphs; DejaVu's own changes
+        and DejaVu Math TeX Gyre are public domain.
+
+  data/fontsets/uni-vga/          UniVGA by Dmitry Bolkhovityanov
+                                  https://www.inp.nsk.su/~bolkhov/files/fonts/univga/
+      - Copyright (c) 2000, 2001 Dmitry Bolkhovityanov; "Freely Distributable"; the
+        permissive licence text Debian records for it is in LICENSE.md there.
+
+  data/fontsets/debian-legacy-fonts/
+                                  BDF fonts from Debian's console-setup 1.242~deb13u1
+                                  (Fonts/bdf/), kept here because no other source has been
+                                  found for them.
+      - "Distributed under many different licenses": public domain (the legacy*, Goha*,
+        Georgian-16, ETL, and misc-fixed variant fonts), Sony Corp., /efont/, GNU Unifont,
+        Adobe/Digital Equipment (Courier) and Sun Microsystems/Bigelow & Holmes (Lucida
+        Typewriter). Debian states: "All console fonts are public domain by nature", the
         copyright of the source BDF fonts they are produced from being as above.
 
-  sources/terminus-font/   Terminus Font by Dimitar Toshkov Zhekov
-                           https://terminus-font.sourceforge.net/
-      - Fonts: SIL Open Font License, Version 1.1, Reserved Font Name
-        "Terminus Font". Text: sources/terminus-font/OFL.TXT
-      - Configure, Python and JavaScript sources: GNU GPL version 2 or (at your
-        option) any later version (sources/terminus-font/README, section 7.1).
+Debian's console-setup is not part of this repository. If it is downloaded into
+sources/console-setup (it is disabled in sources.json), a few tests use it as a reference; it is
+GPL-2.0-or-later apart from its fonts, whose licences are as listed above and in the LICENSE.md
+of data/fontsets/debian-legacy-fonts.
 
-  sources/ucs-fonts/       Unicode versions of the X11 "misc-fixed" fonts
-                           by Markus Kuhn and contributors
-                           https://www.cl.cam.ac.uk/~mgk25/ucs-fonts.html
-      - Public domain. See sources/ucs-fonts/README and sources/ucs-fonts/AUTHORS.
-
-  sources/dejavu/          DejaVu fonts (all 22 TrueType files; the Mono faces by
-                           default, the others on request)
-                           https://dejavu-fonts.github.io/
-      - Bitstream Vera Fonts licence (Copyright (c) 2003 Bitstream, Inc.), Arev
-        Fonts licence (Copyright (c) 2006 Tavmjong Bah) for imported glyphs;
-        DejaVu's own changes are public domain.
-        Text: sources/dejavu/LICENSE
-
-  sources/uni-vga/         UniVGA by Dmitry Bolkhovityanov
-                           https://www.inp.nsk.su/~bolkhov/files/fonts/univga/
-      - Copyright (c) 2000, 2001 Dmitry Bolkhovityanov; the upstream archive
-        (uni-vga.lsm) says "Freely Distributable". The permissive licence text
-        Debian records for u_vga16.bdf is in sources/console-setup/copyright.fonts.
-
-The one third-party program a part of this repository is derived from:
+One program this repository's code is derived from:
 
   tools/psf_font_maker/otf2bdf/   a Python port of otf2bdf 3.1, which renders the
                            DejaVu TrueType files to BDF (not part of the output)
@@ -121,7 +117,7 @@ the applicable notices (the licence texts named above).
 4. GNU General Public License, version 2
 ================================================================================
 
-(Verbatim copy of sources/console-setup/GPL-2.)
+(The standard text of the GNU General Public License, version 2.)
 
 		    GNU GENERAL PUBLIC LICENSE
 		       Version 2, June 1991

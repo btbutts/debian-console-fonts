@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from psf_font_maker.bdf2psf import output
-from psf_font_maker.bdf2psf.bdf_reader import GlyphSet, read_bdf
+from psf_font_maker.bdf2psf.bdf_reader import GlyphSet, read_bdf, read_bdf_text
 from psf_font_maker.bdf2psf.classify import RAW, TEXT_MODE, classify
 from psf_font_maker.bdf2psf.equivalence import Equivalence, file_lines, meaningful
 from psf_font_maker.bdf2psf.errors import ConversionError, EquivalenceError
@@ -21,20 +21,30 @@ SYMBOL_LINE = re.compile(r"U\+([0-9a-fA-F]+)[ \t\n\r\f\v]*")
 
 
 @dataclass
+class BdfText:
+    """A BDF font that exists only as text, for example one rendered from a TrueType font."""
+
+    name: str
+    text: str
+
+
+@dataclass
 class Request:
     """What to build: the inputs, the kind of font and its number of positions."""
 
-    bdfs: list[Path]
+    bdfs: list[Path | BdfText]
     equivalents: list[Path]
     symbols: list[str]
     font_size: int
     font_type: int = TEXT_MODE
+    echo: bool = True
     warnings: list[str] = field(default_factory=list)
 
     def warn(self, message: str) -> None:
-        """Record a warning and print it."""
+        """Record a warning and, unless told not to, print it."""
         self.warnings.append(message)
-        sys.stderr.write(f"WARNING: {message}")
+        if self.echo:
+            sys.stderr.write(f"WARNING: {message}")
 
 
 def normalise_size(font_type: int, size: int) -> int:
@@ -73,8 +83,11 @@ def build(request: Request) -> Layout:
     """Run the conversion up to a finished layout."""
     size = normalise_size(request.font_type, request.font_size)
     glyph_set = GlyphSet()
-    for path in request.bdfs:
-        read_bdf(path, glyph_set, request.warn)
+    for source in request.bdfs:
+        if isinstance(source, BdfText):
+            read_bdf_text(source.name, source.text, glyph_set, request.warn)
+        else:
+            read_bdf(source, glyph_set, request.warn)
     equivalence = Equivalence()
     kinds = classify(glyph_set, request.font_type, equivalence)
     for path in request.equivalents:

@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING
 from urllib.parse import unquote
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -22,6 +24,9 @@ if TYPE_CHECKING:
 MEMORY_LIMIT_BYTES = 250 * 1024 * 1024  # 250 MiB
 CHUNK_SIZE = 8192
 HTTP_TIMEOUT_SECONDS = 120
+HTTP_RETRIES = 3  # for connection problems, timeouts and temporary server errors
+RETRY_BACKOFF_SECONDS = 2.0
+RETRY_STATUSES = (429, 500, 502, 503, 504)
 GITHUB_OUTPUT_CHANGED = "changed"
 REDRAW_INTERVAL_SECONDS = 0.05  # ~20 Hz
 
@@ -231,6 +236,15 @@ def new_session() -> requests.Session:
     """Create a preconfigured session for dependency downloads."""
     session = requests.Session()
     session.headers.update(_REQUEST_HEADERS)
+    retry = Retry(
+        total=HTTP_RETRIES,
+        backoff_factor=RETRY_BACKOFF_SECONDS,
+        status_forcelist=RETRY_STATUSES,
+        allowed_methods=("GET", "HEAD"),
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
     return session
 
 
