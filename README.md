@@ -103,6 +103,8 @@ out has the tool's default; an option you set to nothing is an error, never the 
 | `DEJAVU_SIZES` | cell widths to render DejaVu at; the height follows from the font | `16 20 24 28 32 40 48 64` |
 | `DEJAVU_PROPORTIONAL` | non-empty adds the 18 proportional DejaVu faces (`DejaVuSans*`, `DejaVuSerif*`, `DejaVuMath`); glyphs wider than the cell are dropped | off |
 | `JOBS` | processes to use | one per CPU |
+| `QUIET` | set to `1` to write only warnings and errors while building | progress is written |
+| `VERBOSE` | set to `1` to list every conversion warning | a summary by kind |
 | `FREETYPE_LIB_DIR` | directory holding the `libfreetype` to render DejaVu with; it is an error if it holds none that is 2.13.3 or later | looked for, then built |
 | `FREETYPE_ARCHIVE_DIR` | a directory that may already hold the FreeType source archive (a package manager's download directory); if it does, that file is used and nothing is downloaded. Its checksum must match | none |
 | `SOURCES` | the manifest that says where each source is | `sources.json` |

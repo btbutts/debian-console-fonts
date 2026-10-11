@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from psf_font_maker.common.errors import ToolError
+from psf_font_maker.common.log import step
 from psf_font_maker.fonts.options import (
     DEFAULT_CODESETS,
     DEFAULT_DEJAVU_SIZES,
@@ -16,6 +17,7 @@ from psf_font_maker.fonts.options import (
     Options,
 )
 from psf_font_maker.fonts.plan import Planner
+from psf_font_maker.fonts.report import Reporter, show_configuration
 from psf_font_maker.fonts.runner import build_all
 from psf_font_maker.otf2bdf.render import use_library_dir
 
@@ -77,6 +79,11 @@ def declare(parser: argparse.ArgumentParser) -> None:
         help="directory holding the libfreetype to render TrueType fonts with "
         "(`psf_font_maker freetype` finds or builds one)",
     )
+    talk = parser.add_mutually_exclusive_group()
+    talk.add_argument("--quiet", action="store_true", help="only write warnings and errors")
+    talk.add_argument(
+        "--verbose", action="store_true", help="list every conversion warning, not a summary"
+    )
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--out", type=Path, help="write the fonts into this directory")
     target.add_argument("--list", action="store_true", help="only list the fonts")
@@ -111,12 +118,22 @@ def run(args: argparse.Namespace) -> int:
     """Carry out the command."""
     if args.freetype_lib_dir is not None:
         use_library_dir(args.freetype_lib_dir)
-    planner = Planner(options_from(args))
+    options = options_from(args)
+    if not args.list and not args.quiet:
+        show_configuration(options, args.out, args.jobs, args.freetype_lib_dir)
+        step("Planning: reading the face tables and working out which code sets each face covers")
+    planner = Planner(options)
     if args.list:
         names = planner.names()
         print("\n".join(names))
         print(f"{len(names)} fonts", file=sys.stderr)
         return 0
-    built = build_all(planner.jobs(), args.out, args.jobs)
+    jobs = planner.jobs()
+    report = Reporter(options, jobs, quiet=args.quiet, verbose=args.verbose)
+    report.show_plan(planner.selected())
+    report.show_start(args.jobs)
+    built = build_all(jobs, args.out, args.jobs, report.on_group)
+    report.show_warnings(built)
+    report.show_done(built, args.out)
     print(f"{len(built)} fonts in {args.out}/")
     return 0

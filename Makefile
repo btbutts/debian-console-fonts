@@ -21,6 +21,8 @@
 #   POOL          good (the faces offered by default) or all
 #   DEJAVU_SIZES, DEJAVU_PROPORTIONAL   how DejaVu is rendered (proportional: set to 1)
 #   JOBS          processes to use
+#   QUIET         set to 1 to write only warnings and errors while building
+#   VERBOSE       set to 1 to list every conversion warning (a summary otherwise)
 #   FREETYPE_LIB_DIR  directory holding a libfreetype 2.13.3 or later to use (Buildroot:
 #                 $(HOST_DIR)/lib); otherwise one is looked for, and built if none is found
 #   FREETYPE_ARCHIVE_DIR  a directory that may already hold the FreeType source archive
@@ -66,6 +68,9 @@ OPTIONS = --data '$(DATA)' --sources '$(SOURCES)' \
 	$(call passed,JOBS,--jobs) \
 	$(if $(DEJAVU_PROPORTIONAL),--dejavu-proportional)
 
+# How much the fonts command says (the freetype command has no such options)
+TALK = $(if $(QUIET),--quiet) $(if $(VERBOSE),--verbose)
+
 FREETYPE_OPTIONS = $(OPTIONS) \
 	$(if $(FREETYPE_LIB_DIR),--lib-dir '$(FREETYPE_LIB_DIR)') \
 	$(if $(FREETYPE_ARCHIVE_DIR),--archive-dir '$(FREETYPE_ARCHIVE_DIR)')
@@ -74,7 +79,7 @@ FREETYPE_OPTIONS = $(OPTIONS) \
 # library to use (nothing if none is needed or the system finds it itself), then the fonts.
 define make_fonts
 dir=$$($(PSF) freetype $(FREETYPE_OPTIONS)) || exit $$?; \
-$(PSF) fonts $(OPTIONS) $${dir:+--freetype-lib-dir "$$dir"} --out '$(1)'
+$(PSF) fonts $(OPTIONS) $(TALK) $${dir:+--freetype-lib-dir "$$dir"} --out '$(1)'
 endef
 
 .DEFAULT_GOAL := fonts

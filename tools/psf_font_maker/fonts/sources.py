@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import cache
+from time import monotonic
 from typing import TYPE_CHECKING
 
 from psf_font_maker.bdf2psf.convert import BdfText
 from psf_font_maker.bdf_double.enlarge import convert as enlarge
 from psf_font_maker.common.errors import ToolError
+from psf_font_maker.common.log import detail
 from psf_font_maker.common.manifest import Manifest
 from psf_font_maker.otf2bdf.bdf_text import to_bdf
 from psf_font_maker.otf2bdf.glyphs import Size
@@ -71,7 +73,11 @@ class SourceTree:
 @cache
 def rendered_text(ttf: Path, cell: int) -> str:
     """Render a TrueType font at cell width *cell* and return it as BDF text."""
-    return to_bdf(render_font(ttf, Size(cell, RESOLUTION)), SPACING, cell)
+    detail(f"rendering {ttf.name} at cell width {cell} with FreeType")
+    started = monotonic()
+    text = to_bdf(render_font(ttf, Size(cell, RESOLUTION)), SPACING, cell)
+    detail(f"rendered {ttf.name} at cell width {cell} in {monotonic() - started:.1f}s")
+    return text
 
 
 @dataclass(frozen=True)

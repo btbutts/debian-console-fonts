@@ -413,3 +413,29 @@ def test_a_failing_font_is_named_in_the_error(tmp_path: Path) -> None:
     broken = replace(job, symbols=(str(tmp_path / "missing.set"),))
     with pytest.raises(ToolError, match="Uni2-Fixed13"):
         build_all([broken], tmp_path / "out", workers=1)
+
+
+def test_building_reports_what_it_does(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """The command says what it was given, the plan, the progress and how it ended."""
+    arguments = ["fonts", "--data", str(DATA), "--sources", str(SOURCES), "--jobs", "1"]
+    arguments += ["--faces", "Fixed13", "--codesets", "Uni2", "--out", str(tmp_path / "out")]
+    assert main(arguments) == 0
+    captured = capsys.readouterr()
+    assert captured.out == f"1 fonts in {tmp_path / 'out'}/\n"
+    for text in (
+        "==> Configuration",
+        "==> Plan: 1 fonts",
+        "Fixed13: finished",
+        "==> Done: 1 fonts",
+    ):
+        assert text in captured.err
+
+
+def test_quiet_building_writes_nothing_on_success(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """--quiet leaves out the step and progress lines."""
+    arguments = ["fonts", "--data", str(DATA), "--sources", str(SOURCES), "--jobs", "1"]
+    arguments += ["--faces", "Fixed13", "--codesets", "Uni2", "--quiet"]
+    assert main([*arguments, "--out", str(tmp_path / "out")]) == 0
+    assert "==>" not in capsys.readouterr().err

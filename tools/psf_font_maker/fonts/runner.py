@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import gzip
 import os
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
+from time import monotonic
 from typing import TYPE_CHECKING
 
 from psf_font_maker.bdf2psf import output
@@ -16,7 +17,7 @@ from psf_font_maker.bdf2psf.convert import Request, build
 from psf_font_maker.common.errors import ToolError
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     from psf_font_maker.fonts.plan import FontJob
 
@@ -34,6 +35,15 @@ class Built:
 
     name: str
     warnings: list[str]
+
+
+@dataclass
+class Group:
+    """The fonts of one face, which one process builds, and the time that took."""
+
+    face: str
+    built: list[Built]
+    seconds: float
 
 
 def compress(data: bytes) -> bytes:
@@ -68,10 +78,12 @@ def write_font(job: FontJob, out: Path) -> Built:
     return Built(job.name, warnings)
 
 
-def write_group(args: tuple[Sequence[FontJob], Path]) -> list[Built]:
+def write_group(args: tuple[Sequence[FontJob], Path]) -> Group:
     """Build the fonts of one face one after another (they share rendered fonts)."""
     jobs, out = args
-    return [write_font(job, out) for job in jobs]
+    started = monotonic()
+    built = [write_font(job, out) for job in jobs]
+    return Group(jobs[0].face, built, monotonic() - started)
 
 
 def by_face(jobs: Sequence[FontJob]) -> list[list[FontJob]]:
@@ -80,14 +92,39 @@ def by_face(jobs: Sequence[FontJob]) -> list[list[FontJob]]:
     return [list(group) for _, group in groupby(ordered, key=lambda job: job.face)]
 
 
-def build_all(jobs: Sequence[FontJob], out: Path, workers: int | None = None) -> list[Built]:
-    """Build every font into *out*; use *workers* processes (default: one per CPU)."""
+def worker_count(workers: int | None, groups: int) -> int:
+    """Return how many processes to use: *workers* (default: one per CPU), at most one a group."""
+    return max(1, min(workers or os.cpu_count() or 1, groups))
+
+
+def build_all(
+    jobs: Sequence[FontJob],
+    out: Path,
+    workers: int | None = None,
+    on_group: Callable[[Group], None] | None = None,
+) -> list[Built]:
+    """Build every font into *out*; use *workers* processes (default: one per CPU).
+
+    *on_group* is called, here and not in a worker, as each face is finished.
+    """
     out.mkdir(parents=True, exist_ok=True)
     groups = by_face(jobs)
-    count = max(1, min(workers or os.cpu_count() or 1, len(groups)))
+    results: list[Group] = []
+
+    def finished(group: Group) -> None:
+        results.append(group)
+        if on_group is not None:
+            on_group(group)
+
+    count = worker_count(workers, len(groups))
     if count == 1:
-        results = [write_group((group, out)) for group in groups]
+        for group in groups:
+            finished(write_group((group, out)))
     else:
         with ProcessPoolExecutor(max_workers=count) as pool:
-            results = list(pool.map(write_group, [(group, out) for group in groups]))
-    return sorted((built for group in results for built in group), key=lambda built: built.name)
+            pending = [pool.submit(write_group, (group, out)) for group in groups]
+            for future in as_completed(pending):
+                finished(future.result())
+    return sorted(
+        (built for group in results for built in group.built), key=lambda built: built.name
+    )
