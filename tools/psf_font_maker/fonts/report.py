@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from time import monotonic
 from typing import TYPE_CHECKING
 
-from psf_font_maker.common.log import detail, say, step, warn
+from psf_font_maker.common.log import detail, emit, step, warn
 from psf_font_maker.fonts.patterns import matches
 from psf_font_maker.fonts.runner import worker_count
 
@@ -218,10 +218,10 @@ class Reporter:
                 example.setdefault(kind, (item.name, message.strip()))
         for kind, count in kinds.most_common(KINDS_SHOWN):
             name, message = example[kind]
-            say(f"    {count:6d} x {kind}   e.g. {name}: {message}")
+            emit(f"    {count:6d} x {kind}   e.g. {name}: {message}")
         if len(kinds) > KINDS_SHOWN:
-            say(f"    ... and {len(kinds) - KINDS_SHOWN} more kinds")
-        say("    (--verbose, or VERBOSE=1 with make, lists every warning)")
+            emit(f"    ... and {len(kinds) - KINDS_SHOWN} more kinds")
+        emit("    (--verbose, or VERBOSE=1 with make, lists every warning)")
 
     def show_done(self, built: Sequence[Built], out: Path) -> None:
         """Say that the work is finished and how long it took."""

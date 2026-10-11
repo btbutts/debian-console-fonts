@@ -23,22 +23,24 @@
 #   JOBS          processes to use
 #   QUIET         set to 1 to write only warnings and errors while building
 #   VERBOSE       set to 1 to list every conversion warning (a summary otherwise)
-#   FREETYPE_LIB_DIR  directory holding a libfreetype 2.13.3 or later to use (Buildroot:
-#                 $(HOST_DIR)/lib); otherwise one is looked for, and built if none is found
-#   FREETYPE_ARCHIVE_DIR  a directory that may already hold the FreeType source archive
-#                 (Buildroot: the package's download directory); used instead of downloading
+# Optional, and normally not needed (the tool finds a FreeType, in a Buildroot host tree too):
+#   FREETYPE_LIB_DIR  directory holding a libfreetype 2.13.3 or later to use instead of
+#                 looking for one
+#   FREETYPE_ARCHIVE_DIR  a directory that may already hold the FreeType source archive;
+#                 used instead of downloading it
 # Where things are:
 #   DATA (the code set tables)  SOURCES (sources.json, which says where each font source,
 #   and the place FreeType is built in, is)
 #   OUT (for `make fonts`)  DESTDIR  PREFIX  FONTDIR (for `make install`)
 #   PYTHON  TOOLS
 #
-# DejaVu is drawn from its TrueType files with FreeType, which must be 2.13.3 or later.
-# Before the fonts are made, the tool is asked to find such a FreeType (given by
-# FREETYPE_LIB_DIR, built earlier, in a Buildroot host tree, or on the system) and, if there
-# is none, to download its source (the "freetype" entry of sources.json) and build it (needs
-# a C compiler and network access). That step is skipped when no selected font is drawn from
-# TrueType.
+# DejaVu is drawn from its TrueType files with the freetype-py package and a FreeType that
+# must be 2.13.3 or later. Before any font is made, the tool writes down what you asked for
+# and checks what that needs: where freetype-py is, and which FreeType is used (given by
+# FREETYPE_LIB_DIR, built earlier, in a Buildroot host tree, or on the system). If there is
+# none it downloads FreeType's source (the "freetype" entry of sources.json) and builds it
+# (needs a C compiler and network access). Nothing of this is looked at when no selected
+# font is drawn from TrueType.
 
 SHELL := /bin/sh
 
@@ -75,11 +77,14 @@ FREETYPE_OPTIONS = $(OPTIONS) \
 	$(if $(FREETYPE_LIB_DIR),--lib-dir '$(FREETYPE_LIB_DIR)') \
 	$(if $(FREETYPE_ARCHIVE_DIR),--archive-dir '$(FREETYPE_ARCHIVE_DIR)')
 
-# Make the fonts into $(1): first the FreeType step, which prints the directory of the
-# library to use (nothing if none is needed or the system finds it itself), then the fonts.
+# What the fonts command is told about FreeType. It checks everything the selection needs
+# (and finds or builds a FreeType) before it builds any font, and logs what it did.
+FONTS_FREETYPE = \
+	$(if $(FREETYPE_LIB_DIR),--freetype-lib-dir '$(FREETYPE_LIB_DIR)') \
+	$(if $(FREETYPE_ARCHIVE_DIR),--freetype-archive-dir '$(FREETYPE_ARCHIVE_DIR)')
+
 define make_fonts
-dir=$$($(PSF) freetype $(FREETYPE_OPTIONS)) || exit $$?; \
-$(PSF) fonts $(OPTIONS) $(TALK) $${dir:+--freetype-lib-dir "$$dir"} --out '$(1)'
+$(PSF) fonts $(OPTIONS) $(TALK) $(FONTS_FREETYPE) --out '$(1)'
 endef
 
 .DEFAULT_GOAL := fonts
@@ -89,8 +94,7 @@ fonts:
 	@$(call make_fonts,$(OUT))
 
 list:
-	@dir=$$($(PSF) freetype $(FREETYPE_OPTIONS)) || exit $$?; \
-	$(PSF) fonts $(OPTIONS) $${dir:+--freetype-lib-dir "$$dir"} --list
+	@$(PSF) fonts $(OPTIONS) $(TALK) $(FONTS_FREETYPE) --list
 
 freetype:
 	@$(PSF) freetype $(FREETYPE_OPTIONS) --always

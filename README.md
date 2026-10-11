@@ -56,12 +56,18 @@ Making the fonts needs no network access, except to fetch FreeType in the one ca
 next.
 
 DejaVu is drawn from its TrueType files with FreeType 2.13.3 or later (older versions hint some
-glyphs differently), through the `freetype-py` Python package. Before it makes any fonts, `make`
-asks the tool for a suitable FreeType, and only when a selected font is drawn from TrueType:
+glyphs differently), through the `freetype-py` Python package. Before it makes any fonts the tool
+writes down what you asked for and checks what that needs (the `==> Requirements` part of its
+log): where `freetype-py` is, looking through the import path of the Python that runs it (a
+Buildroot host tree, a virtual environment or the system's `python3-freetype` are all found),
+and which FreeType it will use. Each place looked at is written on the log, and a missing
+requirement stops the build before any font is made. Nothing of this happens unless a selected
+font is drawn from TrueType. The FreeType is chosen like this:
 
-1. `FREETYPE_LIB_DIR`, if you set it, must hold one (Buildroot passes `$(HOST_DIR)/lib`);
+1. `FREETYPE_LIB_DIR`, if you set it (you never have to), must hold one;
 2. otherwise one built earlier in `build/freetype/` is used;
-3. otherwise one in a Buildroot host tree (`$HOST_DIR`, or the prefix of the running Python);
+3. otherwise one in a Buildroot host tree (`$HOST_DIR`, which Buildroot exports to its packages,
+   or the prefix of the running Python, which is `$(HOST_DIR)` for Buildroot's host Python);
 4. otherwise one on the system (`LD_LIBRARY_PATH`, `/usr/lib` and its multiarch directories,
    `/usr/local/lib`, Homebrew and MacPorts);
 5. otherwise FreeType's source is downloaded and built. The `freetype` entry of `sources.json`
@@ -75,8 +81,9 @@ asks the tool for a suitable FreeType, and only when a selected font is drawn fr
    SHA-256 recorded in `sources.json`, because `configure` from it is run on your machine; a
    re-released tarball needs that hash updated deliberately. Windows cannot build it: give `FREETYPE_LIB_DIR`.
 
-The directory found is handed to the tool as `--freetype-lib-dir`, so the library chosen is the
-one used, whatever else is installed. `make freetype` does just this step. `freetype-py` itself
+The library chosen is the one used, whatever else is installed; the last line of the
+requirements, `check: freetype-py loads FreeType ...`, says which one `freetype-py` really
+loaded. `make freetype` does only the FreeType step. `freetype-py` itself
 must be installed from source so that it uses a separate library rather than its own bundled
 (older) FreeType: `pip install --no-binary freetype-py freetype-py`. To build without DejaVu,
 leave it out of `FACES`.

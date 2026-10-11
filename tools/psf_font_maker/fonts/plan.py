@@ -73,6 +73,15 @@ class Planner:
             self._dejavu = faces
         return self._dejavu
 
+    def wants_truetype(self) -> bool:
+        """Return True if a face pattern can select a DejaVu face (drawn from TrueType files).
+
+        Unlike ``needs_truetype`` this does not render anything, so it can be asked before a
+        FreeType has been chosen. It is a little generous: a face that ``skip`` leaves out
+        still counts.
+        """
+        return self._dejavu_wanted()
+
     def needs_truetype(self) -> bool:
         """Return True if a selected face is rendered from a TrueType file (needs FreeType)."""
         rendered = self.dejavu()

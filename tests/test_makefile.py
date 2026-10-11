@@ -169,3 +169,16 @@ def test_buildroot_downloads_reach_the_freetype_step() -> None:
     ).stdout
     assert "--archive-dir '/dl/pkg'" in passed
     assert "--lib-dir '/host/lib'" in passed
+
+
+def test_fonts_target_passes_freetype_choices_on() -> None:
+    """The fonts command itself is told where FreeType (and its archive) may be; unset, not."""
+    plain = make("-n", "fonts").stdout
+    assert "--freetype-lib-dir" not in plain
+    assert "--freetype-archive-dir" not in plain
+    assert " freetype " not in plain  # one command does the checking and the building
+    passed = make(
+        "-n", "fonts", "FREETYPE_ARCHIVE_DIR=/dl/pkg", "FREETYPE_LIB_DIR=/host/lib"
+    ).stdout
+    assert "--freetype-archive-dir '/dl/pkg'" in passed
+    assert "--freetype-lib-dir '/host/lib'" in passed
