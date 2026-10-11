@@ -1,0 +1,38 @@
+# What the release tarball holds: one git pathspec per line, relative to the repository
+# root. The `release` workflow reads this file; tests/test_release_files.py checks it.
+#
+# A file that is tracked but neither listed here nor in the workflow's NOT_SHIPPED
+# pattern (.github/, tests/, pyproject.toml, .gitignore) fails the release, so a new
+# font source or data file cannot be left out by accident.
+
+# The front door, the manifest the tool reads, the licence and the instructions
+Makefile
+sources.json
+LICENSE
+README.md
+
+# The tool: the whole package, with its non-Python data (fontcodesets/codesets.toml,
+# otf2bdf/LICENSE)
+tools/README.md
+tools/psf_font_maker
+
+# The tables the tool reads
+data/AUTHORS.md
+data/LICENSE.md
+data/README.md
+data/arabic.equivalents
+data/standard.equivalents
+data/ascii.set
+data/linux.set
+data/useful.set
+data/faces.toml
+data/codesets
+
+# The fonts: each source directory whole, so that its LICENSE.md, AUTHORS.md and
+# README.md travel with the fonts they describe
+data/fontsets/sources.lock.json
+data/fontsets/debian-legacy-fonts
+data/fontsets/dejavu
+data/fontsets/terminus-font
+data/fontsets/ucs-fonts
+data/fontsets/uni-vga

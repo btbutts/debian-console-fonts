@@ -50,9 +50,10 @@ alone, so a repackaged upstream archive causes no change and no commit.
 
 ## Building fonts
 
-Needs GNU make, python3 (3.11.4 or later) and the fonts in `data/fontsets/` (a release tarball
-already has them; otherwise run the downloader). Making the fonts needs no network access,
-except to fetch FreeType in the one case described next.
+Needs GNU make, python3 (3.12 or later; 3.12 is the oldest version it is tested with) and the
+fonts in `data/fontsets/` (a release tarball already has them; otherwise run the downloader).
+Making the fonts needs no network access, except to fetch FreeType in the one case described
+next.
 
 DejaVu is drawn from its TrueType files with FreeType 2.13.3 or later (older versions hint some
 glyphs differently), through the `freetype-py` Python package. Before it makes any fonts, `make`

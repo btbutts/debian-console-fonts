@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import re
 import tarfile
 import threading
 import zipfile
@@ -28,6 +29,7 @@ import sources_sync
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+ROOT = Path(__file__).resolve().parents[1]
 OCTET_STREAM = "application/octet-stream"
 SERVICE_UNAVAILABLE = 503
 NOT_FOUND = 404
@@ -774,3 +776,14 @@ def test_single_file_mode_still_works(
     assert dependencyDownloader.main([url, res]) == 0
     values = [line.split("=")[1] for line in out.read_text().splitlines() if "changed=" in line]
     assert values == ["true", "false", "true"]
+
+
+def test_workflow_commits_on_the_downloaders_output_not_on_git_diff() -> None:
+    """The commit step is gated on the step output the downloader writes, and only on that."""
+    text = (ROOT / ".github" / "workflows" / "download-sources.yml").read_text(encoding="utf-8")
+    step_id = re.search(r"id:\s*(\S+)\s+run:.*dependencyDownloader\.py", text)
+    assert step_id is not None
+    assert f"steps.{step_id.group(1)}.outputs.changed == 'true'" in text
+    assert "git diff" not in text
+    assert "git status" not in text
+    assert sources_sync.GITHUB_OUTPUT_CHANGED == "changed"

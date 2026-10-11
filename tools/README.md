@@ -5,8 +5,8 @@ the file headers.
 
 ## psf_font_maker
 
-One Python package (standard library only, Python 3.11 or later) that replaces the Perl
-and C tools the build used. Run it from this directory's parent with
+One Python package (standard library only, Python 3.12 or later; 3.12 is the oldest version
+it is tested with) that replaces the Perl and C tools the build used. Run it from this directory's parent with
 `PYTHONPATH=tools python3 -m psf_font_maker <tool> ...`; the Makefile does that.
 
 ```

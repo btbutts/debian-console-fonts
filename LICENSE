@@ -21,6 +21,12 @@ This applies to:
   tests/test_dependency_downloader.py and the originals in tests/reference/), README.md,
   sources.json, pyproject.toml, and .github/workflows/.
 
+  A release tarball holds only Makefile, sources.json, README.md, this LICENSE file, data/
+  and tools/. The .github/ and tests/ directories (tests/reference/ included) and
+  pyproject.toml, which are named in this file, are in the Git repository only and are not
+  part of a release tarball; they are described here because this file covers the
+  repository, and the licence of a file is the same whether or not it is in the tarball.
+
   tools/psf_font_maker/bdf2psf/ and tools/psf_font_maker/fontcodesets/ (with its
   codesets.toml) are ports of console-setup's bdf2psf and fontcodesets scripts, and
   tests/reference/bdf2psf/ and tests/reference/fontcodesets/ hold the unmodified

@@ -35,6 +35,12 @@ CONFIGURE_OPTIONS = (
     "--with-harfbuzz=no",
     "--with-brotli=no",
 )
+# Variables of the make that runs this tool. DESTDIR is where *our* ``make install`` puts
+# the fonts, and GNU make hands every command-line variable on to a sub-make in MAKEFLAGS
+# (and MAKEOVERRIDES, MFLAGS), which overrides what a makefile sets. FreeType's own
+# ``make install`` honours DESTDIR, so left alone it would install FreeType below the font
+# destination (a Buildroot ``DESTDIR=$(TARGET_DIR)``) instead of in its prefix.
+BUILD_ONLY_VARIABLES = ("DESTDIR", "MAKEFLAGS", "MAKEOVERRIDES", "MFLAGS", "GNUMAKEFLAGS")
 LOG_TAIL_LINES = 25
 TIMEOUT_SECONDS = 60
 CHUNK = 1 << 16
@@ -120,6 +126,17 @@ def fetch(entry: SourceEntry, archive_dirs: Sequence[Path] = ()) -> Path:
     return archive
 
 
+def step_environment(compiler: str) -> dict[str, str]:
+    """Return the environment for FreeType's configure and make.
+
+    It is ours, without the variables that belong to the make that started this tool (see
+    ``BUILD_ONLY_VARIABLES``), and with the compiler chosen.
+    """
+    env = {name: value for name, value in os.environ.items() if name not in BUILD_ONLY_VARIABLES}
+    env["CC"] = compiler
+    return env
+
+
 def find_tools() -> tuple[str, str]:
     """Return the C compiler and make to use, or explain what to install."""
     compiler = os.environ.get("CC") or next((c for c in COMPILERS if shutil.which(c)), None)
@@ -178,7 +195,7 @@ def build(entry: SourceEntry, jobs: int | None = None, archive_dirs: Sequence[Pa
     log.unlink(missing_ok=True)
     print(f"building {archive.name} into {prefix} (log: {log})", file=sys.stderr)
     tree = unpack(archive, work / SOURCE_DIR)
-    env = {**os.environ, "CC": compiler}
+    env = step_environment(compiler)
     steps = [
         ["./configure", f"--prefix={prefix}", *CONFIGURE_OPTIONS],
         [make, f"-j{jobs or os.cpu_count() or 1}"],

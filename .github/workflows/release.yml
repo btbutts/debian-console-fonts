@@ -1,0 +1,180 @@
+name: release
+
+# Builds the release tarball and its checksum from a version tag and publishes them as a
+# GitHub release.
+#
+#   git tag -a v0.0.1 -m "debian-console-fonts 0.0.1" && git push origin v0.0.1
+#
+# or run this workflow by hand and pick the tag in "Use workflow from". A tag below 1.0.0,
+# or with a suffix such as -rc1, is published as a pre-release.
+#
+# Assets:  debian-console-fonts-<version>.tar.gz          (one top-level directory of the
+#                                                         same name, as Buildroot expects)
+#          debian-console-fonts-<version>.tar.gz.sha256   (sha256sum format)
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # to create the release and attach the assets; nothing else
+
+    env:
+      TAG: ${{ github.ref_name }}
+      DEFAULT_BRANCH: master
+      GH_TOKEN: ${{ github.token }}
+      # The tracked files that are NOT in the tarball. Everything else that is tracked has
+      # to be named in .github/release-files.txt, or the build below fails.
+      NOT_SHIPPED: '^(\.github/|tests/|pyproject\.toml$|\.gitignore$)'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0   # the tag has to be compared with the history of the default branch
+
+      - name: Set up Python
+        uses: actions/setup-python@v5.4.0
+        with:
+          python-version: '3.12'   # the oldest version the tool is tested with
+
+      - name: Check the tag
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            echo "::error::Run this workflow from a tag (Use workflow from > Tags)."
+            exit 1
+          fi
+          if ! [[ "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::The tag '$TAG' is not of the form v<major>.<minor>.<patch>[-<suffix>]."
+            exit 1
+          fi
+          major="${BASH_REMATCH[1]}"
+          suffix="${BASH_REMATCH[4]}"
+          prerelease=false
+          if [ "$major" = "0" ] || [ -n "$suffix" ]; then
+            prerelease=true
+          fi
+
+          # A release is only made from what is on the default branch.
+          git fetch --no-tags origin "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}"
+          commit="$(git rev-parse "${TAG}^{commit}")"
+          if ! git merge-base --is-ancestor "$commit" "origin/${DEFAULT_BRANCH}"; then
+            echo "::error::Tag $TAG ($commit) is not on ${DEFAULT_BRANCH}."
+            exit 1
+          fi
+
+          # Never replace the assets of a release that has already been published.
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "::error::A release for $TAG already exists. Delete it first if it must be redone."
+            exit 1
+          fi
+
+          {
+            echo "VERSION=${TAG#v}"
+            echo "PRERELEASE=$prerelease"
+          } >> "$GITHUB_ENV"
+
+      - name: Build the tarball
+        run: |
+          set -euo pipefail
+          name="debian-console-fonts-${VERSION}"
+          mapfile -t paths < <(grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' .github/release-files.txt)
+
+          # Straight from the tagged commit (not the working tree), so nothing untracked can
+          # get in. A listed path that matches nothing makes git archive fail. gzip -n keeps
+          # the name and time out of the header: the same commit gives the same bytes.
+          git archive --format=tar --prefix="${name}/" "$TAG" -- "${paths[@]}" \
+            | gzip -n -9 > "${name}.tar.gz"
+
+          # What the tarball holds must be exactly what is tracked, minus NOT_SHIPPED.
+          tar -tzf "${name}.tar.gz" | sed "s|^${name}/||" | grep -v -e '/$' -e '^$' | sort > shipped.txt
+          git ls-tree -r --name-only "$TAG" | grep -v -E "$NOT_SHIPPED" | sort > tracked.txt
+          if ! diff -u tracked.txt shipped.txt; then
+            echo "::error::The tarball does not match the tracked files. Add the missing paths to .github/release-files.txt (or to NOT_SHIPPED)."
+            exit 1
+          fi
+
+          echo "NAME=${name}" >> "$GITHUB_ENV"
+          ls -l "${name}.tar.gz"
+
+      - name: Build fonts from the tarball
+        run: |
+          set -euo pipefail
+          work="${RUNNER_TEMP}/smoke"
+          rm -rf "$work"
+          mkdir -p "$work"
+          tar -xzf "${NAME}.tar.gz" -C "$work"
+          cd "$work/${NAME}"
+
+          # Only what a user of the tarball has: none of the repository's other files.
+          for path in .github tests pyproject.toml .gitignore; do
+            if [ -e "$path" ]; then
+              echo "::error::$path is in the tarball."
+              exit 1
+            fi
+          done
+
+          # Faces that need no FreeType, so no network either.
+          make fonts FACES="Terminus% VGA%" CODESETS="Uni2" OUT="$work/out" JOBS=2
+          count="$(find "$work/out" -name '*.psf.gz' | wc -l)"
+          echo "built $count fonts"
+          if [ "$count" -lt 20 ]; then
+            echo "::error::Expected at least 20 fonts, built $count."
+            exit 1
+          fi
+
+      - name: Checksum
+        run: |
+          set -euo pipefail
+          sha256sum "${NAME}.tar.gz" > "${NAME}.tar.gz.sha256"
+          sha256sum -c "${NAME}.tar.gz.sha256"
+          cat "${NAME}.tar.gz.sha256"
+
+      - name: Publish the release
+        run: |
+          set -euo pipefail
+          sum="$(cut -d' ' -f1 "${NAME}.tar.gz.sha256")"
+          {
+            echo "Linux console (PSF) fonts, named and laid out the way Debian's console-setup does,"
+            echo "built from the fonts' original sources. Unpack and run make; see README.md."
+            echo
+            echo "SHA-256 of ${NAME}.tar.gz:"
+            echo
+            echo "    ${sum}"
+            echo
+            echo "To check a download, put ${NAME}.tar.gz.sha256 next to the tarball and run:"
+            echo
+            echo "    sha256sum -c ${NAME}.tar.gz.sha256"
+            echo
+            echo "Needs GNU make and Python 3.12 or later. DejaVu faces also need the"
+            echo "freetype-py package and a FreeType 2.13.3 or later (README.md says how it is found,"
+            echo "and how a package manager supplies its own copy of the FreeType source)."
+            echo
+            echo "Do not use GitHub's automatic \"Source code\" archives of this tag: they hold the"
+            echo "whole repository (tests, workflows), not this release."
+          } > notes.md
+
+          flags=()
+          if [ "$PRERELEASE" = "true" ]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$TAG" \
+            "${NAME}.tar.gz" "${NAME}.tar.gz.sha256" \
+            --verify-tag \
+            --title "debian-console-fonts ${VERSION}" \
+            --notes-file notes.md \
+            "${flags[@]}"

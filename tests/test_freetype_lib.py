@@ -53,6 +53,14 @@ printf 'all:\\n\\ttrue\\ninstall:\\n\\tmkdir -p %s/lib\\n\\techo built > %s/lib/
   "$prefix" "$prefix" "%(library)s" > Makefile
 """
 FAILING_CONFIGURE = "#!/bin/sh\necho 'configure: error: no luck'\nexit 1\n"
+# Like FreeType's: the install target honours DESTDIR, as every autotools project does.
+DESTDIR_AWARE_CONFIGURE = """#!/bin/sh
+for option in "$@"; do
+  case "$option" in --prefix=*) prefix="${option#--prefix=}" ;; esac
+done
+printf 'all:\\n\\ttrue\\ninstall:\\n\\tmkdir -p $(DESTDIR)%s/lib\\n' "$prefix" > Makefile
+printf '\\techo built > $(DESTDIR)%s/lib/%s\\n' "$prefix" "%(library)s" >> Makefile
+"""
 
 
 def make_manifest(directory: Path, configure: str | None = None, *, url: str = "") -> Path:
@@ -233,6 +241,27 @@ def test_build_runs_configure_make_install_and_cleans_up(tmp_path: Path) -> None
     assert not (entry.directory / "src").exists()
     log = (entry.directory / "build.log").read_text(encoding="utf-8")
     assert log.index("./configure") < log.index("install")
+
+
+@posix_only
+@has_tools
+def test_the_destination_of_our_own_install_does_not_reach_freetype(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """``make install DESTDIR=...`` must not move FreeType's own install.
+
+    GNU make passes DESTDIR to the tool in the environment and in MAKEFLAGS. FreeType's
+    ``make install`` honours it, so it would end up below the font destination (for
+    Buildroot, in the target root file system) and not in its prefix, where it is looked for.
+    """
+    target = tmp_path / "target"
+    monkeypatch.setenv("DESTDIR", str(target))
+    monkeypatch.setenv("MAKEFLAGS", f"DESTDIR={target}")
+    entry = entry_of(make_manifest(tmp_path, DESTDIR_AWARE_CONFIGURE))
+    directory = build(entry, jobs=1)
+    assert directory == (entry.directory / PREFIX_DIR).resolve() / "lib"
+    assert (directory / LIBRARY_NAME).read_text(encoding="utf-8") == "built\n"
+    assert not target.exists()
 
 
 @posix_only
