@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from time import monotonic
 from typing import TYPE_CHECKING
 
-from psf_font_maker.common.log import detail, emit, step, warn
+from psf_font_maker.common.log import QUIET, VERBOSE, detail, emit, level, note, step, warn
 from psf_font_maker.fonts.patterns import matches
 from psf_font_maker.fonts.runner import worker_count
 
@@ -74,6 +74,33 @@ def show_configuration(
     detail(f"output        : {out}")
 
 
+def show_warnings(built: Sequence[Built]) -> None:
+    """Report the warnings the conversions gave: all of them, or a summary of the kinds."""
+    flagged = [item for item in built if item.warnings]
+    total = sum(len(item.warnings) for item in flagged)
+    if not total:
+        return
+    if level() >= VERBOSE:
+        for item in flagged:
+            for message in item.warnings:
+                warn(f"{item.name}: {message.strip()}")
+        return
+    warn(f"{total} conversion warnings in {len(flagged)} of {len(built)} fonts (by kind):")
+    kinds: Counter[str] = Counter()
+    example: dict[str, tuple[str, str]] = {}
+    for item in flagged:
+        for message in item.warnings:
+            kind = kind_of(message)
+            kinds[kind] += 1
+            example.setdefault(kind, (item.name, message.strip()))
+    for kind, count in kinds.most_common(KINDS_SHOWN):
+        name, message = example[kind]
+        emit(f"    {count:6d} x {kind}   e.g. {name}: {message}")
+    if len(kinds) > KINDS_SHOWN:
+        emit(f"    ... and {len(kinds) - KINDS_SHOWN} more kinds")
+    emit("    (--verbose, or VERBOSE=1 with make, lists every warning)")
+
+
 @dataclass
 class Family:
     """The fonts one face pattern selected, and how far their building is."""
@@ -108,23 +135,21 @@ class Tally:
 class Reporter:
     """Reports on one run of the ``fonts`` command.
 
-    With *quiet* only warnings are written; with *verbose* every conversion warning is
-    listed instead of a summary of them.
+    How much is said while the fonts are made is the level of the log module: a line for
+    each family and code set that is done at all levels, each face and the running
+    percentage from ``NORMAL`` on, and every conversion warning at ``VERBOSE``.
     """
 
     def __init__(
         self,
         options: Options,
         jobs: Sequence[FontJob],
-        *,
-        quiet: bool = False,
-        verbose: bool = False,
     ) -> None:
         """Group the fonts of the plan into families."""
         self.options = options
         self.jobs = jobs
-        self.quiet = quiet
-        self.verbose = verbose
+        self.codeset_total: Counter[tuple[str, str]] = Counter()
+        self.codeset_done: Counter[tuple[str, str]] = Counter()
         self.families: dict[str, Family] = {}
         self.family_of_face: dict[str, str] = {}
         for job in jobs:
@@ -132,6 +157,7 @@ class Reporter:
             family = self.families.setdefault(name, Family(name))
             family.faces.add(job.face)
             family.codesets[codeset_of(job.name)] += 1
+            self.codeset_total[name, codeset_of(job.name)] += 1
             self.family_of_face[job.face] = name
         self.tally = Tally()
 
@@ -141,14 +167,13 @@ class Reporter:
         """Say which fonts the options came to, and warn about requests that gave nothing."""
         fonts = len(self.jobs)
         faces = len({job.face for job in self.jobs})
-        if not self.quiet:
-            step(f"Plan: {fonts} fonts from {faces} faces")
-            width = max((len(name) for name in self.families), default=0)
-            for family in sorted(self.families.values(), key=lambda item: item.name):
-                detail(
-                    f"{family.name:<{width}} : {len(family.faces)} faces, "
-                    f"{family.fonts} fonts ({family.counts()})"
-                )
+        step(f"Plan: {fonts} fonts from {faces} faces")
+        width = max((len(name) for name in self.families), default=0)
+        for family in sorted(self.families.values(), key=lambda item: item.name):
+            detail(
+                f"{family.name:<{width}} : {len(family.faces)} faces, "
+                f"{family.fonts} fonts ({family.counts()})"
+            )
         for pattern in self.options.faces:
             if not any(matches(pattern, face) for face in faces_selected):
                 warn(f"face pattern {pattern}: no face of the pool fits it")
@@ -159,8 +184,6 @@ class Reporter:
 
     def show_start(self, workers: int | None) -> None:
         """Say that the conversion starts."""
-        if self.quiet:
-            return
         faces = len({job.face for job in self.jobs})
         count = worker_count(workers, faces)
         step(f"Building {len(self.jobs)} fonts with {count} process{'es' if count != 1 else ''}")
@@ -168,66 +191,61 @@ class Reporter:
 
     # --- how it goes -------------------------------------------------------------
 
+    def status(self) -> str:
+        """Return a sentence on how far the build is (for the heartbeat)."""
+        tally = self.tally
+        total = len(self.jobs)
+        percent = 100 * tally.fonts // total if total else 100
+        return (
+            f"building: {tally.fonts}/{total} fonts ({percent}%), {tally.faces} faces done, "
+            f"{monotonic() - tally.started:.0f}s elapsed"
+        )
+
     def on_group(self, group: Group) -> None:
-        """Count a finished face; say so when its family or a tenth of the work is done."""
+        """Count a finished face and say what that completed, at the level asked for."""
         family = self.families[self.family_of_face[group.face]]
         fonts = len(group.built)
+        warnings = sum(len(built.warnings) for built in group.built)
         family.fonts_done += fonts
         family.seconds += group.seconds
-        family.warnings += sum(len(built.warnings) for built in group.built)
+        family.warnings += warnings
         tally = self.tally
         tally.faces += 1
         tally.fonts += fonts
-        if self.quiet:
-            return
-        if family.fonts_done == family.fonts:
-            note = f", {family.warnings} warnings" if family.warnings else ""
-            detail(
-                f"{family.name}: finished, {family.fonts} fonts in {len(family.faces)} faces "
-                f"({family.counts()}), {family.seconds:.1f}s of work{note}"
-            )
+        sets = Counter(codeset_of(built.name) for built in group.built)
+        flagged = f", {warnings} warnings" if warnings else ""
+        names = " ".join(sorted(sets))
+        note(f"{group.face}: {fonts} fonts ({names}) in {group.seconds:.1f}s{flagged}")
         total = len(self.jobs)
         percent = 100 * tally.fonts // total
+        for codeset, count in sets.items():
+            key = (family.name, codeset)
+            self.codeset_done[key] += count
+            if self.codeset_done[key] == self.codeset_total[key]:
+                note(
+                    f"{family.name} {codeset}: {self.codeset_done[key]}/"
+                    f"{self.codeset_total[key]} fonts done (all: {tally.fonts}/{total}, "
+                    f"{percent}%, {monotonic() - tally.started:.0f}s)",
+                    at=QUIET,
+                )
+        if family.fonts_done == family.fonts:
+            extra = f", {family.warnings} warnings" if family.warnings else ""
+            note(
+                f"{family.name}: all done, {family.fonts} fonts in {len(family.faces)} faces "
+                f"({family.counts()}), {family.seconds:.1f}s of work{extra}"
+            )
         if percent >= tally.next_percent and tally.fonts < total:
             tally.next_percent = (percent // PERCENT_STEP + 1) * PERCENT_STEP
-            detail(
+            note(
                 f"progress: {tally.fonts}/{total} fonts ({percent}%), "
                 f"{tally.faces} faces done, {monotonic() - tally.started:.1f}s"
             )
 
     # --- how it ended ------------------------------------------------------------
 
-    def show_warnings(self, built: Sequence[Built]) -> None:
-        """Report the warnings the conversions gave: all of them, or a summary of the kinds."""
-        flagged = [item for item in built if item.warnings]
-        total = sum(len(item.warnings) for item in flagged)
-        if not total:
-            return
-        if self.verbose:
-            for item in flagged:
-                for message in item.warnings:
-                    warn(f"{item.name}: {message.strip()}")
-            return
-        warn(f"{total} conversion warnings in {len(flagged)} of {len(built)} fonts (by kind):")
-        kinds: Counter[str] = Counter()
-        example: dict[str, tuple[str, str]] = {}
-        for item in flagged:
-            for message in item.warnings:
-                kind = kind_of(message)
-                kinds[kind] += 1
-                example.setdefault(kind, (item.name, message.strip()))
-        for kind, count in kinds.most_common(KINDS_SHOWN):
-            name, message = example[kind]
-            emit(f"    {count:6d} x {kind}   e.g. {name}: {message}")
-        if len(kinds) > KINDS_SHOWN:
-            emit(f"    ... and {len(kinds) - KINDS_SHOWN} more kinds")
-        emit("    (--verbose, or VERBOSE=1 with make, lists every warning)")
-
     def show_done(self, built: Sequence[Built], out: Path) -> None:
         """Say that the work is finished and how long it took."""
         warnings = sum(len(item.warnings) for item in built)
-        if self.quiet:
-            return
         step(
             f"Done: {len(built)} fonts in {out}/ in {monotonic() - self.tally.started:.1f}s"
             f"{f', {warnings} warnings' if warnings else ''}"

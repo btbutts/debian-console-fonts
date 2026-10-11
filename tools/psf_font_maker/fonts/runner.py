@@ -15,6 +15,7 @@ from psf_font_maker.bdf2psf import output
 from psf_font_maker.bdf2psf.classify import FRAMEBUFFER, TEXT_MODE
 from psf_font_maker.bdf2psf.convert import Request, build
 from psf_font_maker.common.errors import ToolError
+from psf_font_maker.common.log import VERBOSE, note
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -73,8 +74,15 @@ def write_font(job: FontJob, out: Path) -> Built:
         raise BuildError(message) from exc
     target = out / f"{job.name}{SUFFIX}"
     partial = target.with_name(target.name + ".part")
-    partial.write_bytes(compress(data))
+    packed = compress(data)
+    partial.write_bytes(packed)
     partial.replace(target)
+    note(
+        f"{job.name}: converted ({len(data)} bytes), compressed ({len(packed)} bytes), written"
+        f"{f', {len(warnings)} warnings' if warnings else ''}",
+        2,
+        at=VERBOSE,
+    )
     return Built(job.name, warnings)
 
 

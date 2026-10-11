@@ -431,11 +431,15 @@ def test_building_reports_what_it_does(tmp_path: Path, capsys: pytest.CaptureFix
         assert text in captured.err
 
 
-def test_quiet_building_writes_nothing_on_success(
+def test_quiet_building_still_says_what_it_checks_and_does(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """--quiet leaves out the step and progress lines."""
+    """--quiet says less while fonts are made; the checks and the stages are all there."""
     arguments = ["fonts", "--data", str(DATA), "--sources", str(SOURCES), "--jobs", "1"]
     arguments += ["--faces", "Fixed13", "--codesets", "Uni2", "--quiet"]
     assert main([*arguments, "--out", str(tmp_path / "out")]) == 0
-    assert "==>" not in capsys.readouterr().err
+    err = capsys.readouterr().err
+    for heading in ("Configuration", "Requirements", "Planning", "Plan:", "Building", "Done:"):
+        assert f"==> {heading}" in err
+    assert "progress:" not in err
+    assert "Fixed13 Uni2: 1/1 fonts done" in err

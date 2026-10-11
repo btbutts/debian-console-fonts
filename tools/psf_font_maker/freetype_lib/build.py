@@ -10,13 +10,16 @@ import sys
 import tarfile
 import urllib.error
 import urllib.request
+from time import monotonic
 from typing import TYPE_CHECKING
 
+from psf_font_maker.common.log import Heartbeat, detail
 from psf_font_maker.freetype_lib.errors import FreetypeError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
+    from typing import BinaryIO
 
     from psf_font_maker.common.manifest import SourceEntry
 
@@ -44,6 +47,8 @@ BUILD_ONLY_VARIABLES = ("DESTDIR", "MAKEFLAGS", "MAKEOVERRIDES", "MFLAGS", "GNUM
 LOG_TAIL_LINES = 25
 TIMEOUT_SECONDS = 60
 CHUNK = 1 << 16
+PROGRESS_SECONDS = 3.0
+MEGABYTE = 1 << 20
 
 
 def digest_of(path: Path) -> str:
@@ -65,7 +70,10 @@ def verify(archive: Path, entry: SourceEntry) -> Path:
     if not entry.sha256:
         message = f"sources.json records no sha256 for {entry.name!r}; refusing to build it"
         raise FreetypeError(message)
+    detail(f"checking the SHA-256 of {archive.name.removesuffix('.part')}", 2)
     actual = digest_of(archive)
+    if actual == entry.sha256:
+        detail(f"SHA-256 {actual}: matches sources.json: PASS", 3)
     if actual != entry.sha256:
         message = (
             f"{archive} has SHA-256 {actual}, but sources.json records {entry.sha256}. If "
@@ -73,6 +81,20 @@ def verify(archive: Path, entry: SourceEntry) -> Path:
         )
         raise FreetypeError(message)
     return archive
+
+
+def copy_with_progress(source: BinaryIO, target: BinaryIO, total: int) -> None:
+    """Copy *source* to *target*, writing a line every few seconds about how far it is."""
+    done = 0
+    reported = monotonic()
+    while block := source.read(CHUNK):
+        target.write(block)
+        done += len(block)
+        if monotonic() - reported >= PROGRESS_SECONDS:
+            reported = monotonic()
+            of = f" of {total / MEGABYTE:.1f} MB ({100 * done // total}%)" if total else ""
+            detail(f"downloaded {done / MEGABYTE:.1f} MB{of}", 3)
+    detail(f"downloaded {done / MEGABYTE:.1f} MB: done", 3)
 
 
 def provided(entry: SourceEntry, directories: Sequence[Path]) -> Path | None:
@@ -83,6 +105,7 @@ def provided(entry: SourceEntry, directories: Sequence[Path]) -> Path | None:
     name = entry.url.rsplit("/", 1)[-1]
     for directory in directories:
         if (directory / name).is_file():
+            detail(f"the source archive is already at hand: {directory / name}", 2)
             return verify(directory / name, entry)
     return None
 
@@ -102,14 +125,14 @@ def fetch(entry: SourceEntry, archive_dirs: Sequence[Path] = ()) -> Path:
         return found
     archive = entry.directory / entry.url.rsplit("/", 1)[-1]
     entry.directory.mkdir(parents=True, exist_ok=True)
-    print(f"downloading {entry.url}", file=sys.stderr)
+    detail(f"downloading {entry.url}", 2)
     partial = archive.with_name(archive.name + ".part")
     try:
         with (
             urllib.request.urlopen(entry.url, timeout=TIMEOUT_SECONDS) as reply,
             partial.open("wb") as handle,
         ):
-            shutil.copyfileobj(reply, handle)
+            copy_with_progress(reply, handle, int(reply.headers.get("Content-Length") or 0))
     except (urllib.error.URLError, TimeoutError) as exc:
         partial.unlink(missing_ok=True)
         message = (
@@ -167,19 +190,29 @@ def unpack(archive: Path, target: Path) -> Path:
     return trees[0]
 
 
+def short_name(command: list[str]) -> str:
+    """Return a command's name without its options (``./configure``, ``make install``)."""
+    words = [command[0], *(word for word in command[1:2] if not word.startswith("-"))]
+    return " ".join(words)
+
+
 def run(command: list[str], cwd: Path, log: Path, env: dict[str, str]) -> None:
     """Run one build step, appending its output to *log*; show the end of it on failure."""
+    started = monotonic()
+    name = short_name(command)
     with log.open("ab") as handle:
         handle.write(f"$ {' '.join(command)}\n".encode())
         handle.flush()
-        result = subprocess.run(
-            command, cwd=cwd, env=env, stdout=handle, stderr=subprocess.STDOUT, check=False
-        )
+        with Heartbeat(lambda: f"still running {name} ({monotonic() - started:.0f}s)"):
+            result = subprocess.run(
+                command, cwd=cwd, env=env, stdout=handle, stderr=subprocess.STDOUT, check=False
+            )
     if result.returncode != 0:
         text = log.read_text(encoding="utf-8", errors="replace")
         tail = text.splitlines()[-LOG_TAIL_LINES:]
-        message = f"building FreeType failed ({' '.join(command[:2])}); the end of {log}:\n"
+        message = f"building FreeType failed ({name}); the end of {log}:\n"
         raise FreetypeError(message + "\n".join(tail))
+    detail(f"{name}: done in {monotonic() - started:.0f}s", 3)
 
 
 def build(entry: SourceEntry, jobs: int | None = None, archive_dirs: Sequence[Path] = ()) -> Path:
@@ -187,21 +220,27 @@ def build(entry: SourceEntry, jobs: int | None = None, archive_dirs: Sequence[Pa
     if sys.platform == "win32":
         message = "building FreeType is not supported on Windows; set FREETYPE_LIB_DIR"
         raise FreetypeError(message)
+    detail("build tools:", 2)
     compiler, make = find_tools()
+    detail(f"C compiler: {compiler}; make: {make}", 3)
+    detail("getting the source archive:", 2)
     archive = fetch(entry, archive_dirs)
     work = entry.directory
     prefix = (work / PREFIX_DIR).resolve()
     log = work / LOG_NAME
     log.unlink(missing_ok=True)
-    print(f"building {archive.name} into {prefix} (log: {log})", file=sys.stderr)
+    detail(f"unpacking {archive.name}", 2)
     tree = unpack(archive, work / SOURCE_DIR)
+    detail(f"building it into {prefix} (full output: {log})", 2)
     env = step_environment(compiler)
     steps = [
         ["./configure", f"--prefix={prefix}", *CONFIGURE_OPTIONS],
         [make, f"-j{jobs or os.cpu_count() or 1}"],
         [make, "install"],
     ]
-    for step in steps:
+    for number, step in enumerate(steps, start=1):
+        detail(f"step {number} of {len(steps)}: {short_name(step)}", 2)
         run(step, tree, log, env)
     shutil.rmtree(work / SOURCE_DIR, ignore_errors=True)
+    detail(f"FreeType is installed in {prefix}", 2)
     return prefix / "lib"

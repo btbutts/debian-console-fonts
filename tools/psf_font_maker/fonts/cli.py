@@ -6,10 +6,10 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from psf_font_maker.common.log import set_quiet, step
+from psf_font_maker.common.log import NORMAL, QUIET, VERBOSE, Heartbeat, set_level, step
 from psf_font_maker.fonts.plan import Planner
 from psf_font_maker.fonts.preflight import check_requirements
-from psf_font_maker.fonts.report import Reporter, show_configuration
+from psf_font_maker.fonts.report import Reporter, show_configuration, show_warnings
 from psf_font_maker.fonts.runner import build_all
 from psf_font_maker.fonts.selection import declare_selection, options_from
 
@@ -39,9 +39,17 @@ def declare(parser: argparse.ArgumentParser) -> None:
         "manager's download directory); it is used instead of downloading",
     )
     talk = parser.add_mutually_exclusive_group()
-    talk.add_argument("--quiet", action="store_true", help="only write warnings and errors")
     talk.add_argument(
-        "--verbose", action="store_true", help="list every conversion warning, not a summary"
+        "--quiet",
+        action="store_true",
+        help="say less while the fonts are made (a line per family and code set, and a "
+        "heartbeat); the configuration, the checks of the environment, the stages and the "
+        "warnings are always written",
+    )
+    talk.add_argument(
+        "--verbose",
+        action="store_true",
+        help="say more while the fonts are made: each font written, every conversion warning",
     )
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--out", type=Path, help="write the fonts into this directory")
@@ -50,7 +58,7 @@ def declare(parser: argparse.ArgumentParser) -> None:
 
 def run(args: argparse.Namespace) -> int:
     """Carry out the command: say what was asked, check what it needs, then build."""
-    set_quiet(quiet=args.quiet)
+    set_level(QUIET if args.quiet else VERBOSE if args.verbose else NORMAL)
     options = options_from(args)
     if not args.list:
         show_configuration(options, args.out, args.jobs, args.freetype_lib_dir)
@@ -68,11 +76,12 @@ def run(args: argparse.Namespace) -> int:
         print(f"{len(names)} fonts", file=sys.stderr)
         return 0
     jobs = planner.jobs()
-    report = Reporter(options, jobs, quiet=args.quiet, verbose=args.verbose)
+    report = Reporter(options, jobs)
     report.show_plan(planner.selected())
     report.show_start(args.jobs)
-    built = build_all(jobs, args.out, args.jobs, report.on_group)
-    report.show_warnings(built)
+    with Heartbeat(report.status):
+        built = build_all(jobs, args.out, args.jobs, report.on_group)
+    show_warnings(built)
     report.show_done(built, args.out)
     print(f"{len(built)} fonts in {args.out}/")
     return 0

@@ -19,7 +19,7 @@ from psf_font_maker.fonts.plan import Planner
 from psf_font_maker.fonts.selection import declare_selection, options_from
 from psf_font_maker.freetype_lib.build import PREFIX_DIR, SOURCE_NAME, build
 from psf_font_maker.freetype_lib.errors import FreetypeError
-from psf_font_maker.freetype_lib.locate import Located, explicit, locate, text
+from psf_font_maker.freetype_lib.locate import Located, explicit, locate, search, text
 from psf_font_maker.otf2bdf.render import MINIMUM_FREETYPE
 
 if TYPE_CHECKING:
@@ -69,18 +69,24 @@ class Chosen:
 
 def describe(chosen: Chosen) -> str:
     """Return one line that says which FreeType is used and where it is."""
-    where = chosen.located.directory or "the system's library path"
-    return f"FreeType {text(chosen.located.version)} ({chosen.how}): {where}"
+    located = chosen.located
+    where = located.library or located.directory or "the system's library path"
+    return f"using FreeType {text(located.version)} ({chosen.how}): {where}"
 
 
 @dataclass(frozen=True)
 class Wish:
-    """What the user said about FreeType: a directory to use, archives, jobs, no building."""
+    """What the user said about FreeType, and where else to look for one before building.
+
+    *extra_dirs* are tried after the usual places: the directory of freetype-py, which may
+    carry a FreeType of its own.
+    """
 
     lib_dirs: Sequence[Path] = ()
     archive_dirs: Sequence[Path] = ()
     jobs: int | None = None
     no_build: bool = False
+    extra_dirs: Sequence[Path] = ()
 
 
 def provide(entry: SourceEntry, wish: Wish, *, needed: bool) -> Chosen | None:
@@ -92,20 +98,26 @@ def provide(entry: SourceEntry, wish: Wish, *, needed: bool) -> Chosen | None:
         detail("no selected font needs FreeType")
         return None
     if wish.lib_dirs:
+        detail("looking only where you said (the build is not allowed to look anywhere else):")
         return Chosen(explicit(list(wish.lib_dirs)), "given")
     found, rejected = locate(entry.directory / PREFIX_DIR / "lib")
+    if found is None and wish.extra_dirs:
+        detail("where freetype-py itself looks (a FreeType it brings along):")
+        found = search(list(wish.extra_dirs), rejected)
     if found is not None:
         return Chosen(found, "found")
     wanted = text(MINIMUM_FREETYPE)
-    detail(f"no FreeType {wanted} or later found")
+    detail(f"no FreeType {wanted} or later found in any of these places")
     for line in rejected:
-        detail(line, 2)
+        detail(f"rejected: {line}", 2)
     if wish.no_build:
         message = f"no FreeType {wanted} or later; run `make freetype` to build one"
         raise FreetypeError(message)
-    detail("building one from FreeType's source (it needs a C compiler, make and, unless the")
-    detail("archive is already at hand, the network)")
+    version = entry.version or wanted
+    detail(f"so this tool downloads the source of FreeType {version} and builds it itself")
+    detail("(needs a C compiler, make and, unless the archive is at hand, the network)")
     directory = build(entry, wish.jobs, list(wish.archive_dirs))
+    detail("checking the FreeType that was just built:")
     return Chosen(explicit([directory]), "built")
 
 

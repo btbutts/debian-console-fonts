@@ -21,8 +21,11 @@
 #   POOL          good (the faces offered by default) or all
 #   DEJAVU_SIZES, DEJAVU_PROPORTIONAL   how DejaVu is rendered (proportional: set to 1)
 #   JOBS          processes to use
-#   QUIET         set to 1 to write only warnings and errors while building
-#   VERBOSE       set to 1 to list every conversion warning (a summary otherwise)
+#   QUIET, VERBOSE  how much is said while the fonts are made (set to 1). The configuration,
+#                 every check of the build environment, the stages and the warnings are
+#                 always written. QUIET: a line per family and code set, and a heartbeat;
+#                 default: also each face and the percentage; VERBOSE: also each font and
+#                 every conversion warning
 # Optional, and normally not needed (the tool finds a FreeType, in a Buildroot host tree too):
 #   FREETYPE_LIB_DIR  directory holding a libfreetype 2.13.3 or later to use instead of
 #                 looking for one

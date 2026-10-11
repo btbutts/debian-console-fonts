@@ -46,10 +46,9 @@ def check_requirements(
         f"a DejaVu face can be selected: it is drawn from TrueType files, which needs freetype-py "
         f"and FreeType {text(MINIMUM_FREETYPE)} or later"
     )
-    find_binding()
-    chosen = provide(
-        planner.tree.manifest.entry("freetype"), Wish(lib_dirs, archive_dirs, jobs), needed=True
-    )
+    binding = find_binding()
+    wish = Wish(lib_dirs, archive_dirs, jobs, extra_dirs=[binding.directory])
+    chosen = provide(planner.tree.manifest.entry("freetype"), wish, needed=True)
     if chosen is not None:
         detail(describe(chosen))
         if chosen.located.directory is not None:

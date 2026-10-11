@@ -32,10 +32,11 @@ LIBRARY_DIRS = ("lib", "lib64")
 
 @dataclass(frozen=True)
 class Located:
-    """A usable FreeType: the directory it is in, or None if the default loader finds it."""
+    """A usable FreeType: its directory (None if the default loader finds it) and version."""
 
     directory: Path | None
     version: Version
+    library: str = ""
 
 
 def text(version: Version) -> str:
@@ -66,13 +67,30 @@ def system_dirs() -> list[Path]:
     return [*from_environment, *multiarch, *(Path(name) for name in SYSTEM_DIRS)]
 
 
+def check_library(library: Path | str, rejected: list[str]) -> Version | None:
+    """Test the FreeType *library* and say how it went; return its version if it passes."""
+    wanted = text(MINIMUM_FREETYPE)
+    detail(f"checking {library}", 2)
+    version = probe_version(library)
+    if version is None:
+        rejected.append(f"{library}: not a usable FreeType library")
+        detail("not a usable FreeType library: FAIL", 3)
+        return None
+    shown = f"FreeType version {text(version)} (need {wanted} or later)"
+    if version < MINIMUM_FREETYPE:
+        rejected.append(f"{library}: FreeType {text(version)}")
+        detail(f"{shown}: TOO OLD", 3)
+        return None
+    detail(f"{shown}: PASS", 3)
+    return version
+
+
 def search(directories: list[Path], rejected: list[str]) -> Located | None:
     """Return the first FreeType in *directories* that is new enough.
 
-    Each directory looked at is written on the log. Libraries that are found but too old or
-    unusable are described in *rejected*.
+    Each directory and library looked at is written on the log. Libraries that are found but
+    too old or unusable are described in *rejected*.
     """
-    wanted = text(MINIMUM_FREETYPE)
     seen: set[Path] = set()
     for directory in directories:
         if directory in seen:
@@ -85,16 +103,9 @@ def search(directories: list[Path], rejected: list[str]) -> Located | None:
         if not libraries:
             detail(f"{directory}: no libfreetype", 2)
         for library in libraries:
-            version = probe_version(library)
-            if version is None:
-                rejected.append(f"{library}: not a usable FreeType library")
-                detail(f"{library}: not a usable FreeType library", 2)
-            elif version < MINIMUM_FREETYPE:
-                rejected.append(f"{library}: FreeType {text(version)}")
-                detail(f"{library}: FreeType {text(version)}, too old (need {wanted})", 2)
-            else:
-                detail(f"{library}: FreeType {text(version)}, new enough (need {wanted})", 2)
-                return Located(directory, version)
+            version = check_library(library, rejected)
+            if version is not None:
+                return Located(directory, version, str(library))
     return None
 
 
@@ -104,22 +115,14 @@ def by_name(rejected: list[str]) -> Located | None:
     if not name:
         detail("the system's loader (ctypes.util.find_library): no FreeType", 2)
         return None
-    version = probe_version(name)
-    if version is None:
-        detail(f"the system's loader gave {name}, which is not a usable FreeType library", 2)
-        return None
-    if version >= MINIMUM_FREETYPE:
-        detail(f"the system's loader gave {name}: FreeType {text(version)}, new enough", 2)
-        return Located(None, version)
-    rejected.append(f"{name}: FreeType {text(version)}")
-    detail(f"the system's loader gave {name}: FreeType {text(version)}, too old", 2)
-    return None
+    detail(f"the system's loader answers {name}", 2)
+    version = check_library(name, rejected)
+    return Located(None, version, name) if version is not None else None
 
 
 def explicit(directories: list[Path]) -> Located:
     """Return the FreeType in the directories the user named; it is an error if none is."""
     rejected: list[str] = []
-    detail("looking only in the directory you named:")
     found = search(directories, rejected)
     if found is None:
         wanted = text(MINIMUM_FREETYPE)

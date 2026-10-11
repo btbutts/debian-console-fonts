@@ -156,7 +156,7 @@ def test_the_name_lookup_is_used_last(monkeypatch: pytest.MonkeyPatch, tmp_path:
     monkeypatch.setattr(locate_module, "probe_version", lambda _name: FAKE_VERSION)
     monkeypatch.setattr(ctypes.util, "find_library", lambda _name: "libfreetype.so.6")
     found, _ = locate_module.locate(tmp_path)
-    assert found == Located(None, FAKE_VERSION)
+    assert found == Located(None, FAKE_VERSION, "libfreetype.so.6")
 
 
 def test_too_old_a_freetype_is_rejected_and_reported(
