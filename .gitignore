@@ -1,4 +1,4 @@
-.venv/
+.debian-console-fonts.venv/
 __pycache__/
 *.pyc
 .pytest_cache/
