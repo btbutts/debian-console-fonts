@@ -1,0 +1,11 @@
+{
+        "python-envs.pythonProjects": [
+        {
+            "path": "${workspaceFolder}",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        }
+    ],
+    "python.defaultInterpreterPath": "${workspaceFolder}/.debian-console-fonts.venv/bin/python",
+    "pylint.interpreter": [ "${workspaceFolder}/.debian-console-fonts.venv/bin/python" ]
+}
